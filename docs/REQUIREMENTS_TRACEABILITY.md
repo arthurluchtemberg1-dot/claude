@@ -8,8 +8,8 @@ Atualizado em: 2026-09-24. Estados de requisito conforme R11-03/R46-01: "Impleme
 
 | Estado | Requisitos |
 | --- | --- |
-| ✅ Implementado localmente | 218 |
-| 🟡 Parcial | 78 |
+| ✅ Implementado localmente | 221 |
+| 🟡 Parcial | 75 |
 | ⛔ Bloqueado externamente | 12 |
 | ⏳ Planejado | 115 |
 | 📄 Método/documento | 13 |
@@ -365,7 +365,7 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R16-08 | Separar pago conhecido, orgânico conhecido, direto, recuperação, sem atribuição (ausente/inválido/expirado/conflitante). | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  |  |
 | R16-09 | Crédito de clique anterior após retorno pela bio conforme política/janela; exibir caminho observado; sem prometer paridade com a Meta. | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  |  |
 | R16-10 | Modelos fracionados: pesos somam 1; receita não multiplica; "conversões creditadas" ≠ pedidos inteiros. | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  |  |
-| R16-11 | Renovações não atribuídas indefinidamente à aquisição sem visão de coorte. | E2 | 🟡 Parcial | Renovação marcada revenue_kind=renewal; visão de coorte pendente | financial.test.ts |  |  |
+| R16-11 | Renovações não atribuídas indefinidamente à aquisição sem visão de coorte. | E2 | ✅ Implementado localmente | Renovações (revenue_kind=renewal) contam na receita bruta pela data da renovação e ficam fora da receita atribuída à aquisição nas bases por aprovação/movimento e nas campanhas; base por coorte credita a receita posterior do cliente à atribuição da primeira compra | metrics-bases.test.ts |  |  |
 | R16-12 | Métricas internas separadas das conversões reportadas pelas redes; não somar conversões de várias redes como compradores únicos; view-throu… | E2 | ✅ Implementado localmente | Métricas internas separadas; conversões das redes não somadas (aviso no painel) | — |  |  |
 
 ### 17. Pixels, Meta CAPI e deduplicação
@@ -456,9 +456,9 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | ID | Requisito | Etapa | Estado | Implementação | Testes | Dependência | Observação |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | R22-01 | Serviço único de métricas compartilhado por dashboard, API, relatórios, regras, IA e app; cada métrica declara fonte, fórmula, denominador,… | E3 | ✅ Implementado localmente | packages/domain/src/metrics/*; apps/api/src/services/metrics-repo.ts | metrics-fixture.test.ts, webhook-pipeline.test.ts |  |  |
-| R22-02 | Bases temporais: por aprovação, por movimento financeiro, por coorte de aquisição; nunca apresentadas como iguais. | E3 | 🟡 Parcial | Aprovação e movimento implementados; coorte usa base de aprovação (identidade de cliente pendente) | webhook-pipeline.test.ts |  |  |
+| R22-02 | Bases temporais: por aprovação, por movimento financeiro, por coorte de aquisição; nunca apresentadas como iguais. | E3 | ✅ Implementado localmente | basisCtes (apps/api/src/services/metrics-repo.ts): aprovação por transação no período com reversões até as_of; movimento por data do lançamento; coorte por clientes com primeira compra no período e receita posterior até as_of; mesmo escopo no resumo, série, campanhas, comparação e API pública | metrics-bases.test.ts; webhook-pipeline.test.ts; metrics-fixture.test.ts |  |  |
 | R22-03 | Por aprovação: estornos posteriores ajustam a coorte até `as_of`, mantendo bruto original e histórico. | E3 | ✅ Implementado localmente | packages/domain/src/metrics/*; apps/api/src/services/metrics-repo.ts | metrics-fixture.test.ts, webhook-pipeline.test.ts |  |  |
-| R22-04 | Métricas: pedidos gerados, aprovados brutos, retidos, receita bruta aprovada, estornos financeiros, receita após estornos, receita da organ… | E3 | 🟡 Parcial | Todas as métricas definidas; LTV observado pendente | metrics-fixture.test.ts |  |  |
+| R22-04 | Métricas: pedidos gerados, aprovados brutos, retidos, receita bruta aprovada, estornos financeiros, receita após estornos, receita da organ… | E3 | ✅ Implementado localmente | 27 métricas no registro, incluindo clientes adquiridos e LTV observado (somente coorte, nunca previsão) | metrics-bases.test.ts; metrics-fixture.test.ts |  |  |
 | R22-05 | Denominador zero/inexistente → "—" com razão; conversões fracionadas rotuladas. | E3 | ✅ Implementado localmente | packages/domain/src/metrics/*; apps/api/src/services/metrics-repo.ts | metrics-fixture.test.ts, webhook-pipeline.test.ts |  |  |
 | R22-06 | Custos versionados por vigência: taxa % e fixa de checkout, gateway, antecipação, parcelamento, impostos estimados, comissão, coprodução, c… | E3 | 🟡 Parcial | fee_schedules, cost_entries; antecipação/parcelamento/coprodução como categorias pendentes | — |  |  |
 | R22-07 | Priorizar valores reais do provedor; estimativas identificadas; não subtrair taxa duas vezes quando a origem envia líquido. | E3 | ✅ Implementado localmente | packages/domain/src/metrics/*; apps/api/src/services/metrics-repo.ts | metrics-fixture.test.ts, webhook-pipeline.test.ts |  |  |
@@ -489,7 +489,7 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R24-01 | Lista de vendas: busca por pedido, filtros, origem, valores, taxas, status, método, produto, oferta, cupom, afiliado, histórico; dados pess… | E2/E3 | ✅ Implementado localmente | apps/web/app/(app)/vendas; /v1/orders | E2E |  |  |
 | R24-02 | Detalhe da venda: linha do tempo, recebimentos, eventos, itens, pagamentos, reembolsos, evidência de atribuição, destinos e conciliação; co… | E2/E3 | ✅ Implementado localmente | apps/web/app/(app)/vendas/[id]; /v1/orders/:id | E2E |  |  |
 | R24-03 | Produtos: grupos, ofertas, planos, preço de referência, custos com vigência, mapeamento de IDs externos por provedor; mesmo nome em checkou… | E2/E3 | 🟡 Parcial | Produto por (conta, ID externo), sem unificar por nome | webhook-pipeline.test.ts |  | Grupos/ofertas/planos e custos por produto pendentes |
-| R24-04 | Clientes: histórico, primeira compra, recorrência, receita/contribuição, consentimentos, vínculos; deduplicação explicável e reversível; se… | E2/E3 | 🟡 Parcial | Clientes por e-mail normalizado (hash) dentro da organização: histórico, primeira/última compra, recorrência, aprovado/líquido por moeda, consentimentos observados, exclusões reversíveis auditadas; PII mascarada sem pii.read | attribution-customers.test.ts; E2E |  | Contribuição por cliente e deduplicação por outros identificadores pendentes |
+| R24-04 | Clientes: histórico, primeira compra, recorrência, receita/contribuição, consentimentos, vínculos; deduplicação explicável e reversível; se… | E2/E3 | 🟡 Parcial | Clientes por e-mail normalizado (hash) dentro da organização: histórico, primeira/última compra, recorrência, aprovado/líquido por moeda, consentimentos observados, exclusões reversíveis auditadas; PII mascarada sem pii.read | attribution-customers.test.ts; E2E |  | Contribuição por cliente pendente (custos variáveis por pedido ainda não alocados); LTV observado por coorte disponível no painel |
 | R24-05 | Vendas manuais/offline por API ou formulário com permissão, origem, comprovante e auditoria; confirmação manual ≠ checkout; correções por a… | E2/E3 | ✅ Implementado localmente | POST /v1/orders/manual e POST /public/v1/sales (serviço createManualSale; auditado com actor_type user/api_key; provedor "manual") | webhook-pipeline.test.ts; public-api.test.ts |  |  |
 | R24-06 | E-commerce: pagamento, cancelamento, devolução, frete e atendimento separados; respeitar mecanismos de extensão de cada loja. | E2/E3 | ⏳ Planejado | E-commerce (frete/devolução) |  |  |  |
 

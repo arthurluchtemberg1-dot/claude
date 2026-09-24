@@ -12,7 +12,7 @@
 - **E9 (parcial): implantação em contêineres verificada** — imagens api/worker/web, compose de referência executado ponta a ponta, backup/restauração verificados (T69), SMTP com TLS.
 - **E5–E7, E10:** planejadas (catálogo completo com estados reais, sem stubs).
 
-Matriz: 218 requisitos implementados localmente, 78 parciais, 12 bloqueados externamente, 115 planejados, 13 de método/documento. Cenários T01–T70: 56 automatizados e executados, 2 parciais, 11 planejados, 1 bloqueado (ver [`REQUIREMENTS_TRACEABILITY.md`](REQUIREMENTS_TRACEABILITY.md)).
+Matriz: 221 requisitos implementados localmente, 75 parciais, 12 bloqueados externamente, 115 planejados, 13 de método/documento. Cenários T01–T70: 56 automatizados e executados, 2 parciais, 11 planejados, 1 bloqueado (ver [`REQUIREMENTS_TRACEABILITY.md`](REQUIREMENTS_TRACEABILITY.md)).
 
 ## Evidências (executadas nesta sessão)
 
@@ -20,14 +20,14 @@ Matriz: 218 requisitos implementados localmente, 78 parciais, 12 bloqueados exte
 | --- | --- | --- |
 | Lint | `pnpm lint` | sem erros |
 | Tipos | `pnpm typecheck` | sem erros (8 pacotes; conferir o código de saída — `pnpm -s` omite a saída do erro) |
-| Unitários + integração (PostgreSQL 16 e Redis 7 reais) | `pnpm test` | 209 testes passando (20 arquivos) |
+| Unitários + integração (PostgreSQL 16 e Redis 7 reais) | `pnpm test` | 213 testes passando (21 arquivos) |
 | E2E navegador (API + worker/BullMQ + painel, banco `tracker_e2e`) | `pnpm test:e2e` | 3 testes passando, incluindo T70 (com Campanhas, Clientes, Atribuição e criação/uso/revogação de chave de API) |
 | Contêineres | `docker build --target api` (e `worker`, `web`) + `node deploy/compose-smoke.mjs` | imagens construídas; pilha completa (PostgreSQL, Redis, migrações, API, worker, painel) com cadastro → webhook → worker → pedido aprovado |
 | Backup/restauração | `backup-restore.test.ts` (scripts reais com pg_dump/pg_restore) | restauração verificada em banco novo; dump sem segredos/chaves; login e webhook funcionando no banco restaurado |
 | Build | `pnpm build` | API/worker empacotados (executados com `/health` e `/ready` OK), painel Next standalone, SDK 4,3 KiB gzip |
 | Fixture financeira obrigatória | domínio e via webhooks + API | valores exatos com webhooks repetidos 3× |
 
-Defeitos reais encontrados e corrigidos pelos testes: corrida relay→worker (job antes do commit), token do SDK exposto em UTM, origem declarada competindo com vínculo por token, desvio de relógio do checkout, isolamento de tentativas de login entre execuções de teste. Sessão 2: importação CSV por campanha com nomes falhava por falta de permissão de escrita em `ad_entity_names`; nível de gasto escolhido por conta no período inteiro descartava dias importados em outro nível; toques do SDK não extraíam IDs "nome|id" das UTMs (vendas atribuídas por token ficavam sem campanha); restrição de membro a projeto inexistente gerava erro 500; rotas respondiam antes do COMMIT (`reply.send` dentro da transação — causa das falhas intermitentes; D-022); opções SMTP ignoradas pelo nodemailer (TLS não exigido) — corrigido antes de ir a produção.
+Defeitos reais encontrados e corrigidos pelos testes: corrida relay→worker (job antes do commit), token do SDK exposto em UTM, origem declarada competindo com vínculo por token, desvio de relógio do checkout, isolamento de tentativas de login entre execuções de teste. Sessão 2: importação CSV por campanha com nomes falhava por falta de permissão de escrita em `ad_entity_names`; nível de gasto escolhido por conta no período inteiro descartava dias importados em outro nível; toques do SDK não extraíam IDs "nome|id" das UTMs (vendas atribuídas por token ficavam sem campanha); restrição de membro a projeto inexistente gerava erro 500; rotas respondiam antes do COMMIT (`reply.send` dentro da transação — causa das falhas intermitentes; D-022); opções SMTP ignoradas pelo nodemailer (TLS não exigido) — corrigido antes de ir a produção; base por aprovação levava renovações ao mês da primeira compra e as creditava à campanha de aquisição (D-027).
 
 ## Entregue por módulo
 
@@ -43,7 +43,7 @@ Defeitos reais encontrados e corrigidos pelos testes: corrida relay→worker (jo
 
 - Lowify: sem assinatura documentada (proteção por URL secreta), moeda/fuso assumidos por configuração, reembolso tratado como integral, passagem de token por UTM ainda não confirmada com venda real.
 - Meta: nenhum envio/leitura real; limites e deduplicação navegador×servidor a revalidar (docs bloqueadas).
-- Base "por coorte" usa a base por aprovação (sem identidade de cliente); LTV observado pendente.
+- Coorte identifica clientes pelo e-mail informado no checkout; pedidos sem e-mail contam como clientes distintos. Contribuição por cliente pendente.
 - Lowify não documenta vínculo de upsell nem parcelas/repasses: esses recursos só funcionam hoje pelo webhook canônico.
 - Métricas por movimento financeiro ainda não exibem repasses/recebíveis (tabela disponível para conciliação).
 - API pública ainda sem leads/eventos próprios; limite de taxa em janelas no banco (D-020).
@@ -60,8 +60,8 @@ Ver [`EXTERNAL_DEPENDENCIES.md`](EXTERNAL_DEPENDENCIES.md). Os que mais destrava
 
 ## Próximo passo executável
 
-1. Base por coorte e LTV observado por cliente (R16-11, R22); contribuição por cliente.
-2. Teste de carga reproduzível (R42-07) com a pilha de contêineres e estimador de custos (R42-06).
+1. Teste de carga reproduzível (R42-07) com a pilha de contêineres e estimador de custos (R42-06).
+2. Contribuição por pedido/cliente com custos variáveis alocados e consolidação multimoeda com câmbio (R22-10).
 3. Após DEP-META-APP: OAuth Meta (state + PKCE), sincronização de contas/entidades/insights com paginação e backfill, validação CAPI com `test_event_code`.
 
 Para retomar: ler `CLAUDE.md`, este arquivo e a matriz; subir PostgreSQL/Redis (`service postgresql start`; `redis-server --daemonize yes --appendonly yes --dir /tmp`); `pnpm install && pnpm db:migrate && pnpm test`.

@@ -90,3 +90,7 @@ Formato: decisão · contexto · alternativas rejeitadas · consequências. Reve
 
 ## D-026 — "Produção" do e-mail é o ambiente de implantação (APP_ENV)
 - `NODE_ENV=production` é modo de build/execução; `APP_ENV` identifica o ambiente. Transportes `log`/`file` são recusados só com `APP_ENV=production`, permitindo homologação em contêiner com imagens de produção. SMTP com TLS obrigatório em produção (smtps:// ou STARTTLS exigido).
+
+## D-027 — Bases temporais por transação e coorte por cliente
+- Descoberto ao modelar coortes: a base "por aprovação" agrupava pelo pedido e somava todas as transações dele, levando renovações para o mês da primeira compra. Agora: por aprovação = transações aprovadas no período (renovação na data dela) com reversões dessas transações até `as_of`; pedidos contados pela primeira aprovação. Renovações ficam fora da receita atribuída à aquisição (R16-11), inclusive nas campanhas.
+- Coorte de aquisição = clientes (hash do e-mail do checkout na organização) cuja primeira compra aprovada caiu no período; toda a receita posterior deles até `as_of` é creditada pela atribuição da primeira compra. LTV observado = receita após estornos ÷ clientes adquiridos. Um cliente com compras em moedas diferentes aparece em cada moeda.

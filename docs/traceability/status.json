@@ -1668,9 +1668,9 @@
       "stage": "E2"
     },
     {
-      "status": "partial",
-      "impl": "Renovação marcada revenue_kind=renewal; visão de coorte pendente",
-      "tests": "financial.test.ts",
+      "status": "done",
+      "impl": "Renovações (revenue_kind=renewal) contam na receita bruta pela data da renovação e ficam fora da receita atribuída à aquisição nas bases por aprovação/movimento e nas campanhas; base por coorte credita a receita posterior do cliente à atribuição da primeira compra",
+      "tests": "metrics-bases.test.ts",
       "dep": "",
       "note": "",
       "id": "R16-11",
@@ -2217,9 +2217,9 @@
       "stage": "E3"
     },
     {
-      "status": "partial",
-      "impl": "Aprovação e movimento implementados; coorte usa base de aprovação (identidade de cliente pendente)",
-      "tests": "webhook-pipeline.test.ts",
+      "status": "done",
+      "impl": "basisCtes (apps/api/src/services/metrics-repo.ts): aprovação por transação no período com reversões até as_of; movimento por data do lançamento; coorte por clientes com primeira compra no período e receita posterior até as_of; mesmo escopo no resumo, série, campanhas, comparação e API pública",
+      "tests": "metrics-bases.test.ts; webhook-pipeline.test.ts; metrics-fixture.test.ts",
       "dep": "",
       "note": "",
       "id": "R22-02",
@@ -2235,9 +2235,9 @@
       "stage": "E3"
     },
     {
-      "status": "partial",
-      "impl": "Todas as métricas definidas; LTV observado pendente",
-      "tests": "metrics-fixture.test.ts",
+      "status": "done",
+      "impl": "27 métricas no registro, incluindo clientes adquiridos e LTV observado (somente coorte, nunca previsão)",
+      "tests": "metrics-bases.test.ts; metrics-fixture.test.ts",
       "dep": "",
       "note": "",
       "id": "R22-04",
@@ -2428,7 +2428,7 @@
       "impl": "Clientes por e-mail normalizado (hash) dentro da organização: histórico, primeira/última compra, recorrência, aprovado/líquido por moeda, consentimentos observados, exclusões reversíveis auditadas; PII mascarada sem pii.read",
       "tests": "attribution-customers.test.ts; E2E",
       "dep": "",
-      "note": "Contribuição por cliente e deduplicação por outros identificadores pendentes",
+      "note": "Contribuição por cliente pendente (custos variáveis por pedido ainda não alocados); LTV observado por coorte disponível no painel",
       "id": "R24-04",
       "stage": "E2/E3"
     },

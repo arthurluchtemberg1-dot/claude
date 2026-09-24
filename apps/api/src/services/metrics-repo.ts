@@ -2,6 +2,7 @@ import type { PoolClient } from "@tracker/db";
 import { CONNECTOR_CATALOG } from "@tracker/connectors";
 import {
   computeMetrics,
+  formatMinorAsDecimal,
   localDateRangeToUtc,
   ratio,
   type MetricsInput,
@@ -50,7 +51,43 @@ export function orderScopeSql(scope: Pick<MetricsScope, "organizationId" | "proj
       ? `select distinct o.id from public.orders o join public.financial_entries f on f.order_id = o.id where ${orderFilter} and f.occurred_at >= $2 and f.occurred_at < $3`
       : `select o.id from public.orders o where ${orderFilter} and o.first_approved_at >= $2 and o.first_approved_at < $3`;
   const entryWindow = scope.basis === "financial_movement" ? "f.occurred_at >= $2 and f.occurred_at < $3" : "f.occurred_at < $4::timestamptz";
-  return { range, params, orderFilter, periodOrders, entryWindow };
+  return { range, params, orderFilter, periodOrders, entryWindow, ctes: basisCtes(scope.basis, orderFilter), cohort: scope.basis === "acquisition_cohort" };
+}
+
+// Cliente = hash do e-mail do checkout na organização (exclusões manuais e pedidos sem e-mail contam sozinhos).
+const CUSTOMER_KEY = `case when x.order_id is not null or ct.email_sha256 is null then 'pedido:' || o.id::text else ct.email_sha256 end`;
+
+/**
+ * CTEs por base temporal (R22-02): `ent` = lançamentos do razão no escopo (com provider_account_id) e `ord` = pedidos
+ * contados como aprovados, com `unit` (pedido; ou cliente na coorte) para créditos de atribuição.
+ * - Por aprovação: transações aprovadas no período (inclui renovações pela data da renovação) e reversões dessas
+ *   transações até as_of; pedidos contados = primeira aprovação no período.
+ * - Por movimento financeiro: lançamentos datados no período.
+ * - Por coorte de aquisição: clientes cuja primeira compra aprovada caiu no período e toda a receita posterior
+ *   deles (recompras, upsells, renovações) até as_of.
+ */
+function basisCtes(basis: TimeBasis, orderFilter: string): string {
+  const entCols = "f.*, o.provider_account_id";
+  if (basis === "financial_movement") {
+    return `ent as (select ${entCols} from public.financial_entries f join public.orders o on o.id = f.order_id
+                     where ${orderFilter} and f.occurred_at >= $2 and f.occurred_at < $3),
+            ord as (select distinct e.order_id, e.order_id::text as unit from ent e where e.entry_type = 'approval')`;
+  }
+  if (basis === "acquisition_cohort") {
+    return `cust as (select ${CUSTOMER_KEY} as ck, o.id as order_id, o.first_approved_at
+                       from public.orders o left join public.order_contacts ct on ct.order_id = o.id left join public.customer_exclusions x on x.order_id = o.id
+                      where ${orderFilter} and o.first_approved_at is not null and o.first_approved_at < $4::timestamptz),
+            cohort as (select ck from cust group by ck having min(first_approved_at) >= $2 and min(first_approved_at) < $3),
+            ord as (select c.order_id, c.ck as unit from cust c join cohort using (ck)),
+            ent as (select ${entCols} from public.financial_entries f join public.orders o on o.id = f.order_id
+                     where f.order_id in (select order_id from ord) and f.occurred_at < $4::timestamptz)`;
+  }
+  return `ent as (select ${entCols} from public.financial_entries f join public.orders o on o.id = f.order_id
+                   where ${orderFilter} and f.occurred_at < $4::timestamptz
+                     and exists (select 1 from public.financial_entries a
+                                  where a.order_id = f.order_id and a.transaction_key = f.transaction_key and a.entry_type = 'approval'
+                                    and a.occurred_at >= $2 and a.occurred_at < $3)),
+          ord as (select o.id as order_id, o.id::text as unit from public.orders o where ${orderFilter} and o.first_approved_at >= $2 and o.first_approved_at < $3)`;
 }
 
 const LEVEL_RANK = `case s.level when 'account' then 1 when 'campaign' then 2 when 'adset' then 3 else 4 end`;
@@ -66,7 +103,7 @@ export function chosenSpendSql(levels: readonly ("account" | "campaign" | "adset
     base as (
       select distinct on (s.ad_account_id, s.level, s.entity_external_id, s.spend_date) s.*, ${LEVEL_RANK} as lvl
         from public.ad_spend_daily s
-       where s.organization_id = $1 and s.spend_date between $2::date and $3::date and s.currency = $4
+       where s.organization_id = $1 and s.spend_date between $2::date and $3::date and ($4::text is null or s.currency = $4)
          and ($5::uuid[] is null or s.project_id is null or s.project_id = any($5)) ${levelFilter}
        order by s.ad_account_id, s.level, s.entity_external_id, s.spend_date, case s.source when 'api' then 1 when 'csv' then 2 else 3 end),
     day_level as (select ad_account_id, spend_date, min(lvl) as lvl from base group by ad_account_id, spend_date),
@@ -74,9 +111,9 @@ export function chosenSpendSql(levels: readonly ("account" | "campaign" | "adset
 }
 
 export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): Promise<{ currency: string; input: MetricsInput; notes: string[] }[]> {
-  const { range, params, orderFilter, periodOrders, entryWindow } = orderScopeSql(scope);
+  const { range, params, orderFilter, ctes, cohort } = orderScopeSql(scope);
 
-  const currencies = (await c.query(`select distinct o.currency from public.orders o where o.id in (${periodOrders}) and o.currency is not null`, params)).rows.map((r) => String(r.currency).trim());
+  const currencies = (await c.query(`with ${ctes} select distinct trim(e.currency) as currency from ent e`, params)).rows.map((r) => String(r.currency).trim());
   const orgCurrency = String((await c.query("select currency from public.organizations where id = $1", [scope.organizationId])).rows[0].currency).trim();
   if (!currencies.length) currencies.push(orgCurrency);
 
@@ -86,19 +123,21 @@ export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): 
     const cur = "$7";
     const fin = (
       await c.query(
-        `with po as (${periodOrders}),
-         ent as (select f.* from public.financial_entries f join po on po.id = f.order_id where f.currency = ${cur} and ${entryWindow}),
+        `with ${ctes},
+         e as (select * from ent where currency = ${cur}),
          per_order as (
            select order_id,
                   sum(amount_minor) filter (where entry_type = 'approval') as approved,
                   sum(amount_minor) filter (where entry_type in ('approval','refund','chargeback','chargeback_reversal')) as net
-             from ent group by order_id)
+             from e group by order_id),
+         counted as (select ord.order_id, ord.unit, p.net from ord join per_order p on p.order_id = ord.order_id where p.approved > 0)
          select
-           count(*) filter (where approved > 0)::int as approved_orders,
-           count(*) filter (where net > 0)::int as retained_orders,
-           coalesce(sum(approved), 0)::bigint as gross,
-           coalesce((select -sum(amount_minor) from ent where entry_type in ('refund','chargeback','chargeback_reversal')), 0)::bigint as reversals
-         from per_order`,
+           (select count(*) from counted)::int as approved_orders,
+           (select count(*) from counted where net > 0)::int as retained_orders,
+           (select count(distinct unit) from counted)::int as units,
+           coalesce((select sum(amount_minor) from e where entry_type = 'approval'), 0)::bigint as gross,
+           coalesce((select sum(amount_minor) from e where entry_type = 'approval' and revenue_kind = 'renewal'), 0)::bigint as renewal_gross,
+           coalesce((select -sum(amount_minor) from e where entry_type in ('refund','chargeback','chargeback_reversal')), 0)::bigint as reversals`,
         p,
       )
     ).rows[0];
@@ -106,9 +145,7 @@ export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): 
     // Receita da organização por transação (R10-15): participação informada vs produtor sem participação vs desconhecida.
     const org = (
       await c.query(
-        `with po as (${periodOrders}),
-         ent as (select f.*, o.provider_account_id from public.financial_entries f join po on po.id = f.order_id join public.orders o on o.id = f.order_id
-                  where f.currency = ${cur} and ${entryWindow}),
+        `with ${ctes},
          tx as (
            select e.order_id, e.transaction_key, pa.revenue_role,
                   bool_or(e.entry_type = 'org_share') as has_share,
@@ -118,6 +155,7 @@ export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): 
                   bool_or(e.entry_type = 'approval') as approved,
                   -sum(e.amount_minor) filter (where e.entry_type = 'fee') as fee
              from ent e join public.provider_accounts pa on pa.id = e.provider_account_id
+            where e.currency = ${cur}
             group by e.order_id, e.transaction_key, pa.revenue_role)
          select
            coalesce(sum(share_net) filter (where has_share), 0)::bigint as with_share_net,
@@ -136,11 +174,12 @@ export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): 
     // Taxas estimadas por tabela vigente para transações sem taxa informada (rotuladas como estimadas).
     const est = (
       await c.query(
-        `with po as (${periodOrders}),
+        `with ${ctes},
          tx as (
            select t.order_id, t.transaction_key, t.amount_minor, t.approved_at, o.provider_account_id
-             from public.payment_transactions t join po on po.id = t.order_id join public.orders o on o.id = t.order_id
-            where t.status = 'approved' and t.currency = ${cur} and t.fee_minor is null and t.org_share_minor is null)
+             from public.payment_transactions t join public.orders o on o.id = t.order_id
+            where (t.order_id, t.transaction_key) in (select order_id, transaction_key from ent where entry_type = 'approval')
+              and t.status = 'approved' and t.currency = ${cur} and t.fee_minor is null and t.org_share_minor is null)
          select coalesce(sum(round(tx.amount_minor * fs.percent_bp / 10000.0) + fs.fixed_minor), 0)::bigint as estimated, count(fs.id)::int as covered, count(*)::int as total
            from tx left join lateral (
              select * from public.fee_schedules s
@@ -165,17 +204,22 @@ export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): 
     // Atribuição pela política selecionada.
     const attrRows = (
       await c.query(
-        `with po as (${periodOrders}),
-         per_order as (
-           select f.order_id,
-                  sum(f.amount_minor) filter (where f.entry_type = 'approval') as approved,
-                  sum(f.amount_minor) filter (where f.entry_type in ('approval','refund','chargeback','chargeback_reversal')) as net
-             from public.financial_entries f join po on po.id = f.order_id where f.currency = ${cur} and ${entryWindow} group by f.order_id)
-         select po.order_id, po.approved, po.net, a.category, a.model, a.policy_version, a.credits, a.window_days,
+        `with ${ctes},
+         -- Unidade de crédito: o pedido; na coorte, o cliente (creditado pela atribuição da primeira compra).
+         unit_first as (select distinct on (ord.unit) ord.unit, ord.order_id as first_order
+                          from ord join public.orders o on o.id = ord.order_id order by ord.unit, o.first_approved_at, o.id),
+         -- Fora da coorte, renovações ficam fora da receita atribuída à aquisição (R16-11).
+         per_unit as (
+           select ord.unit,
+                  sum(e.amount_minor) filter (where e.entry_type = 'approval' and (${cohort ? "true" : "e.revenue_kind <> 'renewal'"})) as approved,
+                  sum(e.amount_minor) filter (where e.entry_type in ('approval','refund','chargeback','chargeback_reversal') and (${cohort ? "true" : "e.revenue_kind <> 'renewal'"})) as net
+             from ord join ent e on e.order_id = ord.order_id where e.currency = ${cur} group by ord.unit)
+         select u.unit, p.approved, p.net, a.category, a.model, a.policy_version, a.credits, a.window_days,
                 (select coalesce(json_agg(t.id), '[]') from public.touchpoints t
                   where t.organization_id = $1 and t.is_paid and t.id::text in (select x->>'touchpoint_id' from jsonb_array_elements(a.credits) x)) as paid_touch_ids
-           from per_order po left join public.order_attributions a on a.order_id = po.order_id and a.is_current and a.policy_key = $8 and a.organization_id = $1
-          where po.approved > 0`,
+           from unit_first u join per_unit p on p.unit = u.unit
+           left join public.order_attributions a on a.order_id = u.first_order and a.is_current and a.policy_key = $8 and a.organization_id = $1
+          where p.approved > 0`,
         [...p, scope.policyKey],
       )
     ).rows;
@@ -275,7 +319,9 @@ export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): 
     ).rows[0];
 
     const notes: string[] = [];
-    if (scope.basis === "acquisition_cohort") notes.push("Base por coorte de aquisição usa as aprovações iniciais do período e toda receita posterior até as_of");
+    if (cohort) notes.push(`Coorte: ${fin.units} cliente(s) com primeira compra no período; receita posterior (recompras, upsells e renovações) até ${scope.asOf.toISOString()}`);
+    else if (BigInt(fin.renewal_gross) > 0n)
+      notes.push(`Renovações (${formatMinorAsDecimal(BigInt(fin.renewal_gross), currency)}) incluídas na receita bruta e fora da receita atribuída à aquisição; veja a base por coorte`);
 
     out.push({
       currency,
@@ -304,6 +350,7 @@ export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): 
             transactionsWithoutFee: Math.max(0, org.tx_without_fee - est.covered),
           },
           ordersWithPaymentAttempt: pendingCapable ? generated.with_attempt : null,
+          customersAcquired: cohort ? fin.units : null,
         },
         attribution: {
           policyLabel,

@@ -40,7 +40,11 @@ interface Timeseries {
   attribution_quality: { category: string; quality: string; orders: number }[];
 }
 
+const COHORT_ONLY = new Set(["customers_acquired", "ltv_observed"]);
+
 const CARD_ORDER = [
+  "customers_acquired",
+  "ltv_observed",
   "gross_approved_revenue",
   "revenue_after_reversals",
   "financial_reversals",
@@ -224,7 +228,10 @@ export default function DashboardPage() {
             <p className="text-sm text-muted">Há vendas em {summary.data!.groups.length} moedas. Sem câmbio configurado, cada moeda é exibida separadamente (sem somar).</p>
           )}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {CARD_ORDER.map((id) => byId.get(id)).filter((m): m is Metric => !!m).map((m) => (
+            {CARD_ORDER.filter((id) => basis === "acquisition_cohort" || !COHORT_ONLY.has(id))
+              .map((id) => byId.get(id))
+              .filter((m): m is Metric => !!m)
+              .map((m) => (
               <MetricCard key={m.id} m={m} prev={prevById.get(m.id)} onOpen={() => setOpen(m)} />
             ))}
           </div>

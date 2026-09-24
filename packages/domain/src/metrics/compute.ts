@@ -87,6 +87,8 @@ export interface FinancialInputs {
   };
   /** Pedidos com tentativa de pagamento conhecida (inclui recusados/pendentes). null = conector não informa. */
   readonly ordersWithPaymentAttempt: number | null;
+  /** Clientes adquiridos no período (somente base por coorte; null nas demais). */
+  readonly customersAcquired?: number | null;
 }
 
 export interface AttributionInputs {
@@ -187,6 +189,17 @@ export function computeMetrics(input: MetricsInput): Record<MetricId, MetricResu
     notes: [`Estornos considerados até ${f.asOf.toISOString()}`],
   };
   out.gross_approved_revenue = money("gross_approved_revenue", f.grossApprovedMinor, cur, "complete");
+  // Coorte de aquisição (R16-11, R22): clientes adquiridos e LTV observado — nunca previsão.
+  if (f.basis !== "acquisition_cohort" || f.customersAcquired === null || f.customersAcquired === undefined) {
+    out.customers_acquired = undef("customers_acquired", "Disponível na base por coorte de aquisição");
+    out.ltv_observed = undef("ltv_observed", "Disponível na base por coorte de aquisição");
+  } else {
+    out.customers_acquired = { id: "customers_acquired", status: "ok", unit: "count", value: whole(f.customersAcquired), fractional: false, quality: "complete", notes: [] };
+    out.ltv_observed =
+      f.customersAcquired === 0
+        ? undef("ltv_observed", "Nenhum cliente adquirido no período")
+        : money("ltv_observed", divRoundHalfEven(f.grossApprovedMinor - f.reversalsMinor, BigInt(f.customersAcquired)), cur, "complete", [`Observado até ${f.asOf.toISOString()}; não é previsão`]);
+  }
   out.financial_reversals = money("financial_reversals", f.reversalsMinor, cur, "complete");
   const revenueAfter = f.grossApprovedMinor - f.reversalsMinor;
   out.revenue_after_reversals = money("revenue_after_reversals", revenueAfter, cur, "complete");

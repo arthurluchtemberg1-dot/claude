@@ -46,11 +46,9 @@ function ratioMetric(num: Ratio, denMinor: bigint | null, missingReason: string,
 }
 
 export async function computeBreakdown(c: PoolClient, scope: BreakdownScope) {
-  const { params, periodOrders, entryWindow } = orderScopeSql(scope);
+  const { params, ctes } = orderScopeSql(scope);
   const dim = scope.dimension;
-  const currencies = new Set<string>(
-    (await c.query(`select distinct o.currency from public.orders o where o.id in (${periodOrders}) and o.currency is not null`, params)).rows.map((r) => String(r.currency).trim()),
-  );
+  const currencies = new Set<string>((await c.query(`with ${ctes} select distinct trim(e.currency) as currency from ent e`, params)).rows.map((r) => String(r.currency).trim()));
   for (const r of (
     await c.query(
       "select distinct currency from public.ad_spend_daily s where s.organization_id = $1 and s.spend_date between $2::date and $3::date and ($4::uuid[] is null or s.project_id is null or s.project_id = any($4))",
@@ -77,14 +75,15 @@ export async function computeBreakdown(c: PoolClient, scope: BreakdownScope) {
     // Vendas: créditos da política por toque (touchpoint → ID da dimensão).
     const credits = (
       await c.query(
-        `with po as (${periodOrders}),
+        `with ${ctes},
+         -- Renovações ficam fora da receita atribuída à aquisição (R16-11); entram nos totais.
          per_order as (
-           select f.order_id,
-                  sum(f.amount_minor) filter (where f.entry_type = 'approval') as approved,
-                  sum(f.amount_minor) filter (where f.entry_type in ('approval','refund','chargeback','chargeback_reversal')) as net
-             from public.financial_entries f join po on po.id = f.order_id where f.currency = $7 and ${entryWindow} group by f.order_id)
+           select order_id,
+                  sum(amount_minor) filter (where entry_type = 'approval' and revenue_kind <> 'renewal') as approved,
+                  sum(amount_minor) filter (where entry_type in ('approval','refund','chargeback','chargeback_reversal') and revenue_kind <> 'renewal') as net
+             from ent where currency = $7 group by order_id)
          select po.order_id, po.approved, po.net, a.category, x->>'weight' as weight, t.network, ${TOUCH_KEY[dim]} as key, t.campaign_id
-           from per_order po
+           from ord join per_order po on po.order_id = ord.order_id
            left join public.order_attributions a on a.organization_id = $1 and a.order_id = po.order_id and a.is_current and a.policy_key = $8
            left join lateral jsonb_array_elements(case when a.category is null or a.category = 'unattributed' then '[]'::jsonb else a.credits end) x on true
            left join public.touchpoints t on t.organization_id = $1 and t.id = (x->>'touchpoint_id')::uuid
@@ -96,13 +95,21 @@ export async function computeBreakdown(c: PoolClient, scope: BreakdownScope) {
     let unattributedGross = 0n;
     let pendingOrders = 0;
     const allOrders = new Set<string>();
-    let totalGross = 0n;
-    let totalNet = 0n;
+    // Totais do escopo (inclui renovações), iguais aos do resumo na mesma base.
+    const tot = (
+      await c.query(
+        `with ${ctes} select coalesce(sum(amount_minor) filter (where entry_type = 'approval'), 0)::bigint as gross,
+                coalesce(sum(amount_minor) filter (where entry_type in ('approval','refund','chargeback','chargeback_reversal')), 0)::bigint as net,
+                coalesce(sum(amount_minor) filter (where entry_type = 'approval' and revenue_kind = 'renewal'), 0)::bigint as renewal
+           from ent where currency = $7`,
+        [...params, currency],
+      )
+    ).rows[0];
+    const totalGross = BigInt(tot.gross);
+    const totalNet = BigInt(tot.net);
     for (const r of credits) {
       if (!allOrders.has(r.order_id)) {
         allOrders.add(r.order_id);
-        totalGross += BigInt(r.approved);
-        totalNet += BigInt(r.net);
         if (!r.category) pendingOrders++;
         else if (r.category === "unattributed") {
           unattributedOrders++;
@@ -175,6 +182,7 @@ export async function computeBreakdown(c: PoolClient, scope: BreakdownScope) {
       );
     }
     if (pendingOrders) notes.push(`${pendingOrders} pedido(s) aprovado(s) ainda sem atribuição calculada`);
+    if (BigInt(tot.renewal) > 0n) notes.push(`Renovações (${tot.renewal} na menor unidade) nos totais e fora da receita atribuída às campanhas de aquisição`);
     notes.push("Custos de mídia lançados manualmente (influenciadores, ações offline) não entram no detalhamento por campanha");
 
     const rows = [...buckets.values()]

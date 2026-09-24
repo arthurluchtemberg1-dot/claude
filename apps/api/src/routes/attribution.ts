@@ -163,18 +163,19 @@ export const attributionRoutes =
           asOf: deps.now(),
           includeTest: false,
         };
-        const { params, periodOrders, entryWindow } = orderScopeSql(scope);
+        const { params, ctes } = orderScopeSql(scope);
         const policies = (await c.query("select policy_key, name, version, model, window_days from public.attribution_policies where is_active order by policy_key = 'default' desc, policy_key")).rows;
         const out = [];
         for (const p of policies) {
           const cats = (
             await c.query(
-              `with po as (${periodOrders}),
+              `with ${ctes},
                per_order as (
-                 select f.order_id, f.currency, sum(f.amount_minor) filter (where f.entry_type = 'approval') as approved
-                   from public.financial_entries f join po on po.id = f.order_id where ${entryWindow} group by f.order_id, f.currency)
-               select trim(po.currency) as currency, coalesce(a.category, 'not_computed') as category, count(*)::int as orders, coalesce(sum(po.approved), 0)::bigint as gross
-                 from per_order po left join public.order_attributions a on a.order_id = po.order_id and a.is_current and a.policy_key = $7
+                 select order_id, trim(currency) as currency, sum(amount_minor) filter (where entry_type = 'approval' and revenue_kind <> 'renewal') as approved
+                   from ent group by order_id, currency)
+               select po.currency, coalesce(a.category, 'not_computed') as category, count(*)::int as orders, coalesce(sum(po.approved), 0)::bigint as gross
+                 from ord join per_order po on po.order_id = ord.order_id
+                 left join public.order_attributions a on a.order_id = po.order_id and a.is_current and a.policy_key = $7
                 where po.approved > 0 group by 1, 2 order by 1, 2`,
               [...params, p.policy_key],
             )

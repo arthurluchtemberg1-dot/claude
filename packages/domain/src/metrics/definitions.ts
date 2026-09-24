@@ -46,12 +46,15 @@ export const METRIC_IDS = [
   "operating_result_estimated",
   "unattributed_orders",
   "breakeven_roas",
+  "customers_acquired",
+  "ltv_observed",
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
 
 const ALL: readonly TimeBasis[] = ["approval", "financial_movement", "acquisition_cohort"];
 const APPROVAL_COHORT: readonly TimeBasis[] = ["approval", "acquisition_cohort"];
+const COHORT: readonly TimeBasis[] = ["acquisition_cohort"];
 
 export const METRIC_DEFINITIONS: Record<MetricId, MetricDefinition> = {
   orders_generated: {
@@ -311,5 +314,27 @@ export const METRIC_DEFINITIONS: Record<MetricId, MetricDefinition> = {
     refundPolicy: "Após estornos",
     notes: "Não calculado com margem não positiva, moedas misturadas ou custos materiais ausentes.",
     bases: ALL,
+  },
+  customers_acquired: {
+    id: "customers_acquired",
+    label: "Clientes adquiridos",
+    unit: "count",
+    formula: "Clientes cuja primeira compra aprovada ocorreu no período",
+    denominator: null,
+    source: "pedidos aprovados agrupados pelo e-mail informado no checkout (hash, por organização); sem e-mail = um cliente por pedido",
+    refundPolicy: "Bruto",
+    notes: "Somente na base por coorte de aquisição.",
+    bases: COHORT,
+  },
+  ltv_observed: {
+    id: "ltv_observed",
+    label: "LTV observado",
+    unit: "money",
+    formula: "Receita após estornos acumulada até as_of pelos clientes da coorte / clientes adquiridos",
+    denominator: "Clientes adquiridos no período",
+    source: "financial_entries dos pedidos dos clientes da coorte",
+    refundPolicy: "Após estornos até as_of",
+    notes: "Valor observado até a data de corte; nunca uma previsão.",
+    bases: COHORT,
   },
 };

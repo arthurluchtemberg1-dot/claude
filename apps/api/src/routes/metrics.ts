@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { AppDeps } from "../context";
 import { jsonSafe, orgTx } from "../lib/org-tx";
 import { assertPermission, assertProjectAccess } from "../services/auth";
-import { computeScopeMetrics } from "../services/metrics-repo";
+import { chosenSpendSql, computeScopeMetrics } from "../services/metrics-repo";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -79,27 +79,41 @@ export const metricsRoutes =
       return orgTx(deps, req, async (c, { org }) => {
         const range = localDateRangeToUtc(q.from, q.to, org.timezone);
         const projectIds = q.project_id ? [q.project_id] : org.projectIds;
-        const r = await c.query(
-          `select to_char(o.first_approved_at at time zone $4, 'YYYY-MM-DD') as day, o.currency,
-                  count(*)::int as approved_orders, sum(o.approved_minor)::bigint as gross, sum(o.approved_minor - o.reversed_minor)::bigint as net
-             from public.orders o
-            where o.first_approved_at >= $1 and o.first_approved_at < $2 and ($3::uuid[] is null or o.project_id = any($3)) and (o.is_test = false or $5)
+        // Receita por data de cada aprovação (renovações no dia da renovação) e reversões dessas transações até agora;
+        // pedidos contados pela primeira aprovação (mesmas regras da base por aprovação do resumo).
+        const money = await c.query(
+          `with appr as (
+             select f.order_id, f.transaction_key, f.occurred_at, trim(f.currency) as currency, f.amount_minor
+               from public.financial_entries f join public.orders o on o.id = f.order_id
+              where f.entry_type = 'approval' and f.occurred_at >= $1 and f.occurred_at < $2 and ($3::uuid[] is null or o.project_id = any($3)) and (o.is_test = false or $5)),
+           rev as (
+             select f.order_id, f.transaction_key, sum(f.amount_minor) as s from public.financial_entries f
+              where f.entry_type in ('refund','chargeback','chargeback_reversal') and (f.order_id, f.transaction_key) in (select order_id, transaction_key from appr)
+              group by 1, 2)
+           select to_char(a.occurred_at at time zone $4, 'YYYY-MM-DD') as day, a.currency, sum(a.amount_minor)::bigint as gross, sum(a.amount_minor + coalesce(r.s, 0))::bigint as net
+             from appr a left join rev r on r.order_id = a.order_id and r.transaction_key = a.transaction_key
             group by 1, 2 order by 1`,
           [range.start, range.end, projectIds, org.timezone, q.include_test],
         );
-        // Mesmo critério do resumo: um único nível por conta e uma única fonte por entidade/dia (T45, T46).
+        const counts = await c.query(
+          `select to_char(o.first_approved_at at time zone $4, 'YYYY-MM-DD') as day, trim(o.currency) as currency, count(*)::int as approved_orders
+             from public.orders o
+            where o.first_approved_at >= $1 and o.first_approved_at < $2 and ($3::uuid[] is null or o.project_id = any($3)) and (o.is_test = false or $5)
+            group by 1, 2`,
+          [range.start, range.end, projectIds, org.timezone, q.include_test],
+        );
+        const byKey = new Map<string, { day: string; currency: string; approved_orders: number; gross: bigint; net: bigint }>();
+        for (const m of money.rows) byKey.set(`${m.day}|${m.currency}`, { day: m.day, currency: m.currency, approved_orders: 0, gross: BigInt(m.gross), net: BigInt(m.net) });
+        for (const k of counts.rows) {
+          const e = byKey.get(`${k.day}|${k.currency}`) ?? { day: k.day, currency: k.currency, approved_orders: 0, gross: 0n, net: 0n };
+          e.approved_orders = k.approved_orders;
+          byKey.set(`${k.day}|${k.currency}`, e);
+        }
+        const days = [...byKey.values()].sort((x, y) => x.day.localeCompare(y.day));
+        // Mesmo critério do resumo: um único nível por conta e dia e uma única fonte por entidade/dia (T45, T46).
         const spend = await c.query(
-          `with acc_level as (
-             select ad_account_id, min(case level when 'account' then 1 when 'campaign' then 2 when 'adset' then 3 else 4 end) as lvl
-               from public.ad_spend_daily where spend_date between $1::date and $2::date group by ad_account_id),
-           chosen as (
-             select distinct on (s.ad_account_id, s.level, s.entity_external_id, s.spend_date) s.*
-               from public.ad_spend_daily s join acc_level l on l.ad_account_id = s.ad_account_id
-                and (case s.level when 'account' then 1 when 'campaign' then 2 when 'adset' then 3 else 4 end) = l.lvl
-              where s.spend_date between $1::date and $2::date
-              order by s.ad_account_id, s.level, s.entity_external_id, s.spend_date, case s.source when 'api' then 1 when 'csv' then 2 else 3 end)
-           select to_char(spend_date, 'YYYY-MM-DD') as day, currency, sum(spend_minor)::bigint as spend from chosen group by 1, 2 order by 1`,
-          [q.from, q.to],
+          `with ${chosenSpendSql()} select to_char(spend_date, 'YYYY-MM-DD') as day, trim(currency) as currency, sum(spend_minor)::bigint as spend from chosen group by 1, 2 order by 1`,
+          [org.id, q.from, q.to, null, projectIds],
         );
         const hours = await c.query(
           `select extract(hour from o.first_approved_at at time zone $4)::int as hour, count(*)::int as orders
@@ -114,7 +128,7 @@ export const metricsRoutes =
             group by 1, 2`,
           [range.start, range.end, projectIds, q.include_test],
         );
-        return jsonSafe({ timezone: org.timezone, days: r.rows, spend: spend.rows, hours: hours.rows, attribution_quality: quality.rows, today: localDateOf(deps.now(), org.timezone) });
+        return jsonSafe({ timezone: org.timezone, days, spend: spend.rows, hours: hours.rows, attribution_quality: quality.rows, today: localDateOf(deps.now(), org.timezone) });
       });
     });
   };
