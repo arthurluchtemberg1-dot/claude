@@ -197,6 +197,27 @@ describe("destino Meta CAPI (servidor local simulando a Graph API)", () => {
 });
 
 describe("relay outbox → BullMQ (Redis real)", () => {
+  it("regressão: job que chega antes do commit do relay aguarda o lock e processa (não conclui vazio)", async () => {
+    const u = await signupVerified(h, "race");
+    const { projectId: pid } = await createOrg(u.client, "Race Org");
+    const c2 = await createConnection(u.client, pid, "lowify");
+    const body = { event: "sale.paid", order_id: `ord_race_${Date.now()}`, sale_amount: 12.5, status: "paid", timestamp: "2026-09-20 10:00:00", product: { id: 7, name: "P", price: 12.5, type: "main" }, customer: null, tracking: null };
+    expect((await postWebhook(h, c2.token, body)).statusCode).toBe(200);
+    const item = (await h.admin.query("select id from public.outbox where organization_id = $1 and status = 'pending'", [u.client.orgId])).rows[0];
+    // Simula o relay segurando o lock da linha (transação ainda não confirmada).
+    const locker = await h.admin.connect();
+    await locker.query("begin");
+    await locker.query("select id from public.outbox where id = $1 for update", [item.id]);
+    const pending = dispatchOutboxItem(h.worker, u.client.orgId!, Number(item.id));
+    await new Promise((r) => setTimeout(r, 300));
+    await locker.query("update public.outbox set status = 'enqueued', enqueued_at = now() where id = $1", [item.id]);
+    await locker.query("commit");
+    locker.release();
+    expect(await pending).toBe("done");
+    const o = await h.admin.query("select approved_minor from public.orders where organization_id = $1", [u.client.orgId]);
+    expect(o.rows[0].approved_minor).toBe(1250n);
+  });
+
   it("T23 Redis indisponível após commit: outbox preserva; ao voltar, trabalho é entregue e processado", async () => {
     const u = await signupVerified(h, "relay");
     const { projectId: pid } = await createOrg(u.client, "Relay Org");

@@ -59,7 +59,7 @@ export const orgRoutes =
 
     app.get("/org", async (req) =>
       orgTx(deps, req, async (c, { org }) => {
-        const r = await c.query("select id, name, slug, timezone, currency, locale, internal_mode, is_demo, mfa_required, created_at from public.organizations where id = $1", [org.id]);
+        const r = await c.query("select id, name, slug, timezone, currency, locale, internal_mode, is_demo, mfa_required, created_at, settings->'cost_policy' as cost_policy from public.organizations where id = $1", [org.id]);
         return { organization: r.rows[0], membership: { role: org.role, permissions: [...org.permissions], project_ids: org.projectIds } };
       }),
     );

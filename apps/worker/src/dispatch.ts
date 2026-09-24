@@ -49,7 +49,10 @@ export async function dispatchOutboxItem(deps: WorkerDeps, orgId: string, outbox
   const pool = deps.pools.system;
   try {
     const topic = await withTx(pool, { organizationId: orgId }, async (c) => {
-      const r = await c.query("select id, topic, payload, status from public.outbox where id = $1 and organization_id = $2 for update skip locked", [outboxId, orgId]);
+      // Espera curta pelo lock: o relay publica no Redis antes de confirmar sua transação, então o job pode chegar
+      // antes do commit. SKIP LOCKED aqui faria o job "concluir" sem processar o item (corrida detectada no E2E).
+      await c.query("set local lock_timeout = '5s'");
+      const r = await c.query("select id, topic, payload, status from public.outbox where id = $1 and organization_id = $2 for update", [outboxId, orgId]);
       const item = r.rows[0];
       if (!item) return { skip: true as const };
       if (item.status === "done" || item.status === "dead") return { skip: true as const };

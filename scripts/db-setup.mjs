@@ -12,7 +12,7 @@ if (env.NODE_ENV === "production") {
   process.exit(1);
 }
 
-const databases = [env.PGDATABASE_DEV ?? "tracker_dev", env.PGDATABASE_TEST ?? "tracker_test"];
+const databases = [env.PGDATABASE_DEV ?? "tracker_dev", env.PGDATABASE_TEST ?? "tracker_test", env.PGDATABASE_E2E ?? "tracker_e2e"];
 const appPassword = env.DB_APP_PASSWORD ?? "dev_app_password";
 const systemPassword = env.DB_SYSTEM_PASSWORD ?? "dev_system_password";
 const adminPassword = env.DB_ADMIN_PASSWORD ?? "postgres";

@@ -1,0 +1,10 @@
+{
+  "name": "Tracker",
+  "short_name": "Tracker",
+  "start_url": "/painel",
+  "display": "standalone",
+  "background_color": "#0f1216",
+  "theme_color": "#1d5fd1",
+  "lang": "pt-BR",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

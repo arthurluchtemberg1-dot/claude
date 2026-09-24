@@ -15,3 +15,5 @@ test-results/
 /tmp/
 packages/tracker/dist/
 apps/web/public/sdk/
+.e2e-outbox/
+apps/web/test-results/

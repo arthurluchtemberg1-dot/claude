@@ -10,7 +10,7 @@ const pools = {
   app: createPool(config.DATABASE_URL_APP, { max: 20, applicationName: "tracker-api" }),
   system: createPool(config.DATABASE_URL_SYSTEM, { max: 10, applicationName: "tracker-api-system" }),
 };
-const email = createEmailSender(config.EMAIL_TRANSPORT, (o, m) => logger.info(o, m), config.NODE_ENV === "production");
+const email = createEmailSender(config.EMAIL_TRANSPORT, (o, m) => logger.info(o, m), config.NODE_ENV === "production", config.EMAIL_OUTBOX_DIR);
 const app = await buildApp({ config, pools, logger, email, now: () => new Date() });
 
 await app.listen({ port: config.API_PORT, host: "0.0.0.0" });

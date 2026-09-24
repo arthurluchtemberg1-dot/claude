@@ -28,7 +28,8 @@ const schema = z.object({
     .default("false")
     .transform((v) => v === "true"),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().max(24 * 90).default(336),
-  EMAIL_TRANSPORT: z.enum(["log", "memory", "smtp"]).default("log"),
+  EMAIL_TRANSPORT: z.enum(["log", "memory", "file", "smtp"]).default("log"),
+  EMAIL_OUTBOX_DIR: z.string().optional(),
   EMAIL_FROM: z.string().default("Tracker <no-reply@example.com>"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "silent"]).default("info"),
   META_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v24.0"),
