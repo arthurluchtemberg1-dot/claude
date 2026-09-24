@@ -10,6 +10,8 @@ import pg from "pg";
 
 // int8 → bigint (dinheiro e contadores nunca viram float). numeric permanece string.
 pg.types.setTypeParser(20, (v: string) => BigInt(v));
+// date → "YYYY-MM-DD" (datas locais de contas/custos não sofrem conversão de fuso do processo).
+pg.types.setTypeParser(1082, (v: string) => v);
 
 export type Queryable = Pick<pg.PoolClient, "query">;
 export type Pool = pg.Pool;
@@ -84,4 +86,14 @@ export function requireEnv(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`Variável de ambiente obrigatória ausente: ${name} (ver .env.example)`);
   return v;
+}
+
+/**
+ * Executa consultas em sequência no mesmo cliente (o protocolo do PostgreSQL não permite consultas
+ * concorrentes numa conexão; Promise.all no mesmo cliente é incorreto).
+ */
+export async function inSequence<T extends readonly (() => Promise<unknown>)[]>(fns: T): Promise<{ [K in keyof T]: Awaited<ReturnType<T[K]>> }> {
+  const out: unknown[] = [];
+  for (const fn of fns) out.push(await fn());
+  return out as { [K in keyof T]: Awaited<ReturnType<T[K]>> };
 }
