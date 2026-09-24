@@ -98,6 +98,7 @@ export function applyFinancialEvent(prev: OrderAggregateState, event: FinancialE
           refundReportedTotalMinor: 0n,
           orgShareMinor: null,
           feeMinor: null,
+          installments: null,
         };
         changed = true;
       } else if (tx.status === "approved") {
@@ -140,6 +141,10 @@ export function applyFinancialEvent(prev: OrderAggregateState, event: FinancialE
           ledger.push(feeEntry(tx, event.feeMinor));
           changed = true;
         }
+        if (tx.installments === null && event.installments != null) {
+          tx.installments = event.installments;
+          changed = true;
+        }
         break;
       }
       const approved: TransactionState = {
@@ -155,6 +160,7 @@ export function applyFinancialEvent(prev: OrderAggregateState, event: FinancialE
         refundReportedTotalMinor: 0n,
         orgShareMinor: event.orgShareMinor ?? null,
         feeMinor: event.feeMinor ?? null,
+        installments: event.installments ?? null,
       };
       if (tx && tx.amountMinor !== null && tx.amountMinor !== event.amountMinor) {
         conflicts.push({

@@ -24,6 +24,10 @@ const sig = createHmac("sha256", process.env.TRACKER_WEBHOOK_SECRET).update(`${t
 await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-tracker-signature": `t=${t},v1=${sig}` }, body });
 ```
 
+## Recebíveis e liquidações (repasses)
+
+`settlement.scheduled` (recebível previsto), `settlement.paid` (liquidado/repassado) e `settlement.canceled` exigem `order` (pedido e transação a que se referem) e `settlement`. São registrados para conciliação e exibidos no detalhe da venda, **sem** gerar venda, receita, lançamento no razão ou evento de conversão. Cada estágio de um `external_settlement_id` é registrado uma vez (reenvios não duplicam). Parcelas de cartão devem ser enviadas assim — nunca como novas `payment.approved` com outro `external_transaction_id`.
+
 ## Idempotência
 
 `source.event_id` identifica o evento semântico: reenvios do mesmo ID não geram novo efeito (contados em `delivery_count`). A transação é identificada por `order.external_transaction_id` (ou `order:{external_order_id}`); dois IDs de evento para a mesma cobrança não duplicam receita.
@@ -40,10 +44,13 @@ await fetch(url, { method: "POST", headers: { "content-type": "application/json"
 | `order.currency` | sim | ISO 4217 |
 | `order.amount_minor` | sim em `payment.approved` | inteiro na menor unidade (ex.: 1799 = R$ 17,99). Aprovação sem valor vai para quarentena |
 | `order.transaction_kind` | não | `initial`, `upsell`, `downsell`, `renewal`, `manual` |
+| `order.parent_order_id` | não | Pedido original de um upsell/downsell com **outra** transação. Vincula somente pedidos da mesma conexão/conta e projeto; se o original ainda não chegou, o vínculo é feito quando ele chegar. Nunca é inferido por e-mail |
+| `order.installments` | não | Número de parcelas no cartão (1–99). Informativo: a receita é o valor aprovado, uma única vez |
 | `order.org_share_minor`, `order.fee_minor` | não | Participação da organização e taxa efetiva informadas pela origem |
 | `order.items[]` | não | `external_product_id`, `name`, `item_type`, `unit_amount_minor`, `quantity` |
 | `refund` | em `refund.succeeded` | `external_refund_id`, `amount_minor`, `semantics` (`incremental` \| `cumulative` \| `full`) |
 | `dispute` | em chargeback/disputa | `external_dispute_id`, `amount_minor`, `covers_refund_id` (quando o chargeback cobre um reembolso já registrado) |
+| `settlement` | em `settlement.*` | `external_settlement_id`, `net_amount_minor` (obrigatório), `gross_amount_minor`, `fee_minor`, `installment_number`, `installment_count`, `expected_at`, `anticipated` |
 | `attribution` | não | `tracking_token` (do SDK), `utm_*`, `campaign_id`/`adset_id`/`ad_id`, `fbclid`, `gclid` — dados declaratórios |
 | `customer` | não | `email`, `phone`, `name` — armazenados em estrutura restrita |
 | `organization_id` | — | **Ignorado**: a organização é determinada pela conexão |

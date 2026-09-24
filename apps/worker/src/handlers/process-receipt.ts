@@ -51,6 +51,7 @@ export async function loadOrderState(c: PoolClient, orgId: string, orderId: stri
       refundReportedTotalMinor: t.refund_reported_total_minor,
       orgShareMinor: t.org_share_minor,
       feeMinor: t.fee_minor,
+      installments: t.installments,
     };
   }
   const reversals: Record<string, ReversalState> = {};
@@ -87,13 +88,14 @@ async function persistState(c: PoolClient, orgId: string, orderId: string, provi
   for (const t of Object.values(state.transactions)) {
     await c.query(
       `insert into public.payment_transactions (organization_id, order_id, provider_account_id, transaction_key, kind, status, amount_minor, currency, method,
-          approved_at, status_occurred_at, reversed_net_minor, refund_reported_total_minor, org_share_minor, fee_minor)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+          approved_at, status_occurred_at, reversed_net_minor, refund_reported_total_minor, org_share_minor, fee_minor, installments)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        on conflict (organization_id, order_id, transaction_key) do update set
          kind = excluded.kind, status = excluded.status, amount_minor = excluded.amount_minor, method = excluded.method, approved_at = excluded.approved_at,
          status_occurred_at = excluded.status_occurred_at, reversed_net_minor = excluded.reversed_net_minor,
-         refund_reported_total_minor = excluded.refund_reported_total_minor, org_share_minor = excluded.org_share_minor, fee_minor = excluded.fee_minor, updated_at = now()`,
-      [orgId, orderId, providerAccountId, t.key, t.kind, t.status, t.amountMinor, t.currency, t.method, t.approvedAt, t.statusOccurredAt, t.reversedNetMinor, t.refundReportedTotalMinor, t.orgShareMinor, t.feeMinor],
+         refund_reported_total_minor = excluded.refund_reported_total_minor, org_share_minor = excluded.org_share_minor, fee_minor = excluded.fee_minor,
+         installments = excluded.installments, updated_at = now()`,
+      [orgId, orderId, providerAccountId, t.key, t.kind, t.status, t.amountMinor, t.currency, t.method, t.approvedAt, t.statusOccurredAt, t.reversedNetMinor, t.refundReportedTotalMinor, t.orgShareMinor, t.feeMinor, t.installments],
     );
   }
   for (const r of Object.values(state.reversals)) {
@@ -144,6 +146,49 @@ async function ensureProducts(c: PoolClient, orgId: string, projectId: string, p
   }
 }
 
+/**
+ * Vínculo de upsell/downsell (R10-06, R10-07, T16). Só a declaração explícita da origem (parent_order_id) cria o vínculo,
+ * e somente com pedido da mesma conta lógica do provedor e do mesmo projeto — nunca por e-mail ou similaridade.
+ * O pedido original pode chegar depois: o ID externo fica guardado e o vínculo é resolvido na chegada dele.
+ */
+async function linkParentOrders(
+  c: PoolClient,
+  orgId: string,
+  order: { id: string; project_id: string; provider_account_id: string; external_order_id: string; parent_external_order_id: string | null; parent_order_id: string | null },
+  declaredParent: string | null,
+  receiptId: string,
+) {
+  if (declaredParent && order.parent_external_order_id && order.parent_external_order_id !== declaredParent) {
+    await c.query(
+      "insert into public.order_conflicts (organization_id, order_id, code, message, receipt_id) values ($1, $2, 'parent_mismatch', $3, $4)",
+      [orgId, order.id, `Pedido original declarado (${declaredParent.slice(0, 60)}) difere do já registrado; vínculo original preservado.`, receiptId],
+    );
+  }
+  if (!order.parent_order_id && order.parent_external_order_id) {
+    await c.query(
+      `update public.orders o set parent_order_id = p.id
+         from public.orders p
+        where o.id = $2 and p.organization_id = $1 and p.provider_account_id = o.provider_account_id and p.project_id = o.project_id
+          and p.external_order_id = o.parent_external_order_id and p.id <> o.id`,
+      [orgId, order.id],
+    );
+  }
+  // Upsells que chegaram antes deste pedido original.
+  const children = await c.query(
+    `update public.orders set parent_order_id = $2
+      where organization_id = $1 and provider_account_id = $3 and project_id = $4 and parent_external_order_id = $5 and parent_order_id is null and id <> $2
+      returning id, first_approved_at`,
+    [orgId, order.id, order.provider_account_id, order.project_id, order.external_order_id],
+  );
+  for (const ch of children.rows) {
+    if (!ch.first_approved_at) continue;
+    await c.query(
+      "insert into public.outbox (organization_id, topic, payload, dedup_key, priority) values ($1, 'attribution.compute', $2, $3, 3) on conflict do nothing",
+      [orgId, JSON.stringify({ order_id: ch.id }), `attr:${ch.id}:parent:${order.id}`],
+    );
+  }
+}
+
 /** Remove o token do rastreador de campos UTM declarados (o token completo não é exibido nem exportado, R15-08). */
 function maskTokenInUtm(d: DeclaredTracking): DeclaredTracking {
   const token = d.trackingToken;
@@ -159,8 +204,10 @@ function sanitizedCanonical(ev: NormalizedOrderEvent) {
     source_event_type: ev.sourceEventType,
     occurred_at: ev.occurredAt.toISOString(),
     external_order_id: ev.externalOrderId,
+    parent_external_order_id: ev.parentExternalOrderId,
     is_test: ev.isTest,
     financial: ev.financial.map((f) => JSON.parse(JSON.stringify(f, (_k, v) => (typeof v === "bigint" ? v.toString() : v)))),
+    settlements: (ev.settlements ?? []).map((st) => JSON.parse(JSON.stringify(st, (_k, v) => (typeof v === "bigint" ? v.toString() : v)))),
     declared_tracking: ev.declaredTracking
       ? { ...maskTokenInUtm(ev.declaredTracking), trackingToken: ev.declaredTracking.trackingToken ? `…${ev.declaredTracking.trackingToken.slice(-4)}` : null }
       : null,
@@ -208,17 +255,20 @@ export async function processReceipt(c: PoolClient, orgId: string, receiptId: st
   let newlyApprovedCount = 0;
   for (const [seq, ev] of result.events.entries()) {
     const o = await c.query(
-      `insert into public.orders (organization_id, project_id, provider, provider_account_id, external_order_id, is_test, is_demo, source_first_occurred_at, source_updated_at, first_received_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9)
-       on conflict (organization_id, provider_account_id, external_order_id) do update set updated_at = now()
-       returning id, declared_tracking, source_first_occurred_at, source_updated_at, currency`,
-      [orgId, rec.project_id, conn.provider, rec.provider_account_id, ev.externalOrderId, ev.isTest || rec.is_test, rec.is_demo, ev.occurredAt, rec.received_at],
+      `insert into public.orders (organization_id, project_id, provider, provider_account_id, external_order_id, is_test, is_demo, source_first_occurred_at, source_updated_at,
+          first_received_at, parent_external_order_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10)
+       on conflict (organization_id, provider_account_id, external_order_id) do update set updated_at = now(),
+         parent_external_order_id = coalesce(public.orders.parent_external_order_id, excluded.parent_external_order_id)
+       returning id, project_id, provider_account_id, external_order_id, parent_external_order_id, parent_order_id, declared_tracking, source_first_occurred_at, source_updated_at, currency`,
+      [orgId, rec.project_id, conn.provider, rec.provider_account_id, ev.externalOrderId, ev.isTest || rec.is_test, rec.is_demo, ev.occurredAt, rec.received_at, ev.parentExternalOrderId],
     );
     const order = o.rows[0];
     const orderId = order.id as string;
     orderIds.push(orderId);
     // Lock do pedido: eventos concorrentes do mesmo pedido são serializados (T03, T22).
     await c.query("select id from public.orders where id = $1 for update", [orderId]);
+    await linkParentOrders(c, orgId, order, ev.parentExternalOrderId, receiptId);
 
     let state = await loadOrderState(c, orgId, orderId);
     const ledger: LedgerEntry[] = [];
@@ -246,6 +296,19 @@ export async function processReceipt(c: PoolClient, orgId: string, receiptId: st
       await c.query("insert into public.order_conflicts (organization_id, order_id, code, message, transaction_key, reversal_key, receipt_id) values ($1,$2,$3,$4,$5,$6,$7)", [
         orgId, orderId, cf.code, cf.message, cf.transactionKey ?? null, cf.reversalKey ?? null, receiptId,
       ]);
+    }
+    // Recebíveis/liquidações: registro próprio, sem lançamento de receita nem gatilho de conversão (T18).
+    for (const st of ev.settlements ?? []) {
+      await c.query(
+        `insert into public.settlements (organization_id, project_id, order_id, provider_account_id, settlement_key, stage, transaction_key, installment_number,
+            installment_count, gross_minor, fee_minor, net_minor, currency, anticipated, expected_at, occurred_at, source_receipt_id, is_test, is_demo)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+         on conflict (organization_id, provider_account_id, settlement_key, stage) do nothing`,
+        [
+          orgId, rec.project_id, orderId, rec.provider_account_id, st.settlementKey, st.stage, st.transactionKey, st.installmentNumber, st.installmentCount,
+          st.grossMinor, st.feeMinor, st.netMinor, st.currency, st.anticipated, st.expectedAt, st.occurredAt, receiptId, ev.isTest || rec.is_test, rec.is_demo,
+        ],
+      );
     }
     const totals = orderTotals(state);
     const status = deriveOrderStatus(state);

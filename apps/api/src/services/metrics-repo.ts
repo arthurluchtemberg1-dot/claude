@@ -35,7 +35,11 @@ function parseFrac(s: string): { num: bigint; den: bigint } {
   return { num: BigInt(n ?? "0"), den: BigInt(d ?? "1") };
 }
 
-export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): Promise<{ currency: string; input: MetricsInput; notes: string[] }[]> {
+/**
+ * Fragmentos SQL do escopo de pedidos, compartilhados pelo resumo e pelos detalhamentos (mesmas regras de período,
+ * projeto, teste e base temporal). Parâmetros: $1 org, $2/$3 intervalo UTC, $4 as_of, $5 projetos, $6 incluir teste.
+ */
+export function orderScopeSql(scope: Pick<MetricsScope, "organizationId" | "projectIds" | "from" | "to" | "timezone" | "basis" | "asOf" | "includeTest">) {
   const range = localDateRangeToUtc(scope.from, scope.to, scope.timezone);
   const params: unknown[] = [scope.organizationId, range.start, range.end, scope.asOf, scope.projectIds, scope.includeTest];
   // $4 (as_of) é referenciado com tipo explícito para que todas as consultas compartilhem a mesma lista de parâmetros.
@@ -46,6 +50,31 @@ export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): 
       ? `select distinct o.id from public.orders o join public.financial_entries f on f.order_id = o.id where ${orderFilter} and f.occurred_at >= $2 and f.occurred_at < $3`
       : `select o.id from public.orders o where ${orderFilter} and o.first_approved_at >= $2 and o.first_approved_at < $3`;
   const entryWindow = scope.basis === "financial_movement" ? "f.occurred_at >= $2 and f.occurred_at < $3" : "f.occurred_at < $4::timestamptz";
+  return { range, params, orderFilter, periodOrders, entryWindow };
+}
+
+const LEVEL_RANK = `case s.level when 'account' then 1 when 'campaign' then 2 when 'adset' then 3 else 4 end`;
+
+/**
+ * Linhas de gasto sem dupla contagem (T45, T46): uma fonte por entidade/dia (api > csv > manual) e, por conta e dia,
+ * um único nível — o mais agregado disponível naquele dia entre `levels` (todos quando null).
+ * Parâmetros: $1 org, $2/$3 datas locais, $4 moeda, $5 projetos.
+ */
+export function chosenSpendSql(levels: readonly ("account" | "campaign" | "adset" | "ad")[] | null = null) {
+  const levelFilter = levels ? `and s.level in (${levels.map((l) => `'${l}'`).join(", ")})` : "";
+  return `
+    base as (
+      select distinct on (s.ad_account_id, s.level, s.entity_external_id, s.spend_date) s.*, ${LEVEL_RANK} as lvl
+        from public.ad_spend_daily s
+       where s.organization_id = $1 and s.spend_date between $2::date and $3::date and s.currency = $4
+         and ($5::uuid[] is null or s.project_id is null or s.project_id = any($5)) ${levelFilter}
+       order by s.ad_account_id, s.level, s.entity_external_id, s.spend_date, case s.source when 'api' then 1 when 'csv' then 2 else 3 end),
+    day_level as (select ad_account_id, spend_date, min(lvl) as lvl from base group by ad_account_id, spend_date),
+    chosen as (select b.* from base b join day_level d on d.ad_account_id = b.ad_account_id and d.spend_date = b.spend_date and d.lvl = b.lvl)`;
+}
+
+export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): Promise<{ currency: string; input: MetricsInput; notes: string[] }[]> {
+  const { range, params, orderFilter, periodOrders, entryWindow } = orderScopeSql(scope);
 
   const currencies = (await c.query(`select distinct o.currency from public.orders o where o.id in (${periodOrders}) and o.currency is not null`, params)).rows.map((r) => String(r.currency).trim());
   const orgCurrency = String((await c.query("select currency from public.organizations where id = $1", [scope.organizationId])).rows[0].currency).trim();
@@ -177,20 +206,10 @@ export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): 
       if (BigInt(r.net) > 0n) retainedCredit = addR(retainedCredit, w);
     }
 
-    // Mídia: um único nível por conta e uma única fonte por dia/entidade (T45, T46).
+    // Mídia: um único nível por conta e dia e uma única fonte por dia/entidade (T45, T46).
     const media = (
       await c.query(
-        `with acc_level as (
-           select s.ad_account_id, min(case s.level when 'account' then 1 when 'campaign' then 2 when 'adset' then 3 else 4 end) as lvl
-             from public.ad_spend_daily s
-            where s.organization_id = $1 and s.spend_date between $2::date and $3::date and s.currency = $4 and ($5::uuid[] is null or s.project_id is null or s.project_id = any($5))
-            group by s.ad_account_id),
-         chosen as (
-           select distinct on (s.ad_account_id, s.level, s.entity_external_id, s.spend_date) s.*
-             from public.ad_spend_daily s join acc_level l on l.ad_account_id = s.ad_account_id
-              and (case s.level when 'account' then 1 when 'campaign' then 2 when 'adset' then 3 else 4 end) = l.lvl
-            where s.organization_id = $1 and s.spend_date between $2::date and $3::date and s.currency = $4 and ($5::uuid[] is null or s.project_id is null or s.project_id = any($5))
-            order by s.ad_account_id, s.level, s.entity_external_id, s.spend_date, case s.source when 'api' then 1 when 'csv' then 2 else 3 end)
+        `with ${chosenSpendSql()}
          select coalesce(sum(spend_minor), 0)::bigint as spend, count(*)::int as rows,
                 sum(impressions)::bigint as impressions, count(impressions)::int as imp_rows, sum(link_clicks)::bigint as clicks, count(link_clicks)::int as click_rows
            from chosen`,

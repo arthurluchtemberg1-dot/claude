@@ -30,3 +30,26 @@ export function ratioToDecimalString(r: Ratio, places = 10): string {
 export function ratioToNumber(r: Ratio): number {
   return Number(ratioToDecimalString(r, 12));
 }
+
+export function addRatio(a: Ratio, b: Ratio): Ratio {
+  return a.den === b.den ? ratio(a.num + b.num, a.den) : ratio(a.num * b.den + b.num * a.den, a.den * b.den);
+}
+
+export function mulRatioBy(r: Ratio, k: bigint): Ratio {
+  return ratio(r.num * k, r.den);
+}
+
+export function parseRatio(s: string): Ratio {
+  const [n, d] = s.split("/");
+  return ratio(BigInt(n ?? "0"), BigInt(d ?? "1"));
+}
+
+/** Arredonda para inteiro (half-even) — usado apenas na apresentação de valores monetários rateados. */
+export function roundRatioHalfEven(r: Ratio): bigint {
+  const neg = r.num < 0n;
+  const n = neg ? -r.num : r.num;
+  const q = n / r.den;
+  const rem = n % r.den;
+  const out = rem * 2n > r.den || (rem * 2n === r.den && q % 2n === 1n) ? q + 1n : q;
+  return neg ? -out : out;
+}

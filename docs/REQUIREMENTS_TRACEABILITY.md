@@ -8,18 +8,18 @@ Atualizado em: 2026-09-24. Estados de requisito conforme R11-03/R46-01: "Impleme
 
 | Estado | Requisitos |
 | --- | --- |
-| ✅ Implementado localmente | 206 |
+| ✅ Implementado localmente | 208 |
 | 🟡 Parcial | 81 |
 | ⛔ Bloqueado externamente | 12 |
-| ⏳ Planejado | 124 |
+| ⏳ Planejado | 122 |
 | 📄 Método/documento | 13 |
 | **Total** | **436** |
 
 | Cenários de teste (seção 43) | Quantidade |
 | --- | --- |
-| ✅ Automatizado e executado | 50 |
-| 🟡 Parcial | 5 |
-| ⏳ Planejado | 14 |
+| ✅ Automatizado e executado | 54 |
+| 🟡 Parcial | 2 |
+| ⏳ Planejado | 13 |
 | ⛔ Bloqueado | 1 |
 
 ## Cenários obrigatórios T01–T70
@@ -41,9 +41,9 @@ Atualizado em: 2026-09-24. Estados de requisito conforme R11-03/R46-01: "Impleme
 | T13 | ✅ Automatizado e executado | financial.test.ts; webhook-pipeline.test.ts |
 | T14 | ✅ Automatizado e executado | financial.test.ts |
 | T15 | ✅ Automatizado e executado | financial.test.ts; webhook-pipeline.test.ts |
-| T16 | 🟡 Parcial | Vínculo parent_order_id não persistido |
+| T16 | ✅ Automatizado e executado | order-links-settlements.test.ts (vínculo, ordem invertida, sem vínculo por e-mail/outra conta, conflito, herança de vínculo por token) |
 | T17 | ✅ Automatizado e executado | financial.test.ts; webhook-pipeline.test.ts |
-| T18 | ⏳ Planejado | Parcelas/repasses não modelados |
+| T18 | ✅ Automatizado e executado | order-links-settlements.test.ts; financial.test.ts (parcelas e repasses sem nova compra/receita) |
 | T19 | ✅ Automatizado e executado | canonical-meta.test.ts; webhook-pipeline.test.ts |
 | T20 | ✅ Automatizado e executado | lowify.test.ts; canonical-meta.test.ts; webhook-pipeline.test.ts |
 | T21 | ✅ Automatizado e executado | canonical-meta.test.ts; webhook-pipeline.test.ts |
@@ -64,14 +64,14 @@ Atualizado em: 2026-09-24. Estados de requisito conforme R11-03/R46-01: "Impleme
 | T36 | ✅ Automatizado e executado | sdk.test.ts; E2E |
 | T37 | ✅ Automatizado e executado | sdk.test.ts; tracking-attribution.test.ts |
 | T38 | ✅ Automatizado e executado | utm-money-time.test.ts; tracking-attribution.test.ts |
-| T39 | 🟡 Parcial | Junção por ID implementada; teste de renomeação pendente |
+| T39 | ✅ Automatizado e executado | breakdown-projects.test.ts (renomeação preserva junção por ID; nome vigente e anteriores) |
 | T40 | ✅ Automatizado e executado | tracking-attribution.test.ts; rls.itest.ts |
 | T41 | ✅ Automatizado e executado | attribution.test.ts |
 | T42 | 🟡 Parcial | event_id estável; coordenação com pixel do navegador pendente (DEP-META-DOCS) |
 | T43 | ✅ Automatizado e executado | deliveries-relay.test.ts |
 | T44 | ⏳ Planejado | GA4/Google Ads (DEP-GOOGLE-APP) |
 | T45 | ✅ Automatizado e executado | webhook-pipeline.test.ts |
-| T46 | 🟡 Parcial | Seleção de nível implementada; teste com níveis mistos pendente |
+| T46 | ✅ Automatizado e executado | breakdown-projects.test.ts (conta+campanha+anúncio no mesmo dia sem multiplicar; drill-down) |
 | T47 | ✅ Automatizado e executado | utm-money-time.test.ts |
 | T48 | ✅ Automatizado e executado | utm-money-time.test.ts; nota de fuso da conta em metrics-repo |
 | T49 | ✅ Automatizado e executado | utm-money-time.test.ts; metrics-fixture.test.ts |
@@ -184,7 +184,7 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R06-04 | Login Google somente quando configurado; sem integração social inventada. | E1 | ⛔ Bloqueado externamente | Login Google não implementado |  | DEP-GOOGLE-APP |  |
 | R06-05 | Usuário em várias organizações por associação explícita; organização é a fronteira de isolamento. | E1 | ✅ Implementado localmente | memberships; RLS por organização | apps/api/test/integration/auth-isolation.test.ts, rls.itest.ts |  |  |
 | R06-06 | Organização contém projetos, domínios, integrações, contas de anúncio, produtos, dashboards e regras. | E1 | 🟡 Parcial | projects, provider_connections, ad_accounts, products, attribution_policies por org | — |  | Dashboards salvos e regras ainda não modelados |
-| R06-07 | Projeto pode ter membros e permissões mais restritas. | E1 | ✅ Implementado localmente | project_memberships + assertProjectAccess | — |  | Teste dedicado pendente |
+| R06-07 | Projeto pode ter membros e permissões mais restritas. | E1 | ✅ Implementado localmente | project_memberships + assertProjectAccess | breakdown-projects.test.ts (R06-07: pedidos, detalhe, métricas, série, detalhamento, exportação, conexões) |  | Projeto inexistente/de outra organização → 400 |
 | R06-08 | Agência acessa clientes por vínculos explícitos e revogáveis, sem bypass genérico. | E1 | 🟡 Parcial | packages/db/migrations/0009 agency_links (explícito e revogável) | — |  | Fluxo de UI/API de agência pendente (E8) |
 | R06-09 | Perfis: Proprietário, Administrador, Gestor, Analista, Financeiro, Cliente/leitor com capacidades definidas. | E1 | ✅ Implementado localmente | packages/domain/src/permissions.ts ROLE_PERMISSIONS | packages/domain/test/utm-money-time.test.ts, auth-isolation.test.ts |  |  |
 | R06-10 | Permissões granulares: ler métricas, ler dados pessoais, exportar, configurar pixel, conectar provedor, administrar membros, alterar custos… | E1 | ✅ Implementado localmente | packages/domain/src/permissions.ts PERMISSIONS | auth-isolation.test.ts |  |  |
@@ -257,9 +257,9 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R10-03 | Várias tentativas de pagamento do mesmo pedido não multiplicam vendas. | E2 | ✅ Implementado localmente | packages/domain/src/financial/order-aggregate.ts; packages/db/migrations/0004 | packages/domain/test/financial.test.ts |  |  |
 | R10-04 | Capturas parciais/complementares seguem semântica documentada do provedor. | E2 | 🟡 Parcial | Várias transações aprovadas somam; semântica de captura parcial por provedor não documentada | financial.test.ts | DEP-LOWIFY-SAMPLES |  |
 | R10-05 | Order bump no mesmo pedido soma valor e itens sem criar outra compra. | E2 | ✅ Implementado localmente | packages/domain/src/financial/order-aggregate.ts; packages/db/migrations/0004 | packages/domain/test/financial.test.ts |  |  |
-| R10-06 | Upsell/downsell com outra transação gera registro próprio com vínculo ao pedido original quando comprovado. | E2 | 🟡 Parcial | Contrato aceita parent_order_id; vínculo ainda não persistido em orders.parent_order_id | — |  | Pendência: persistir vínculo comprovado (T16) |
-| R10-07 | Não vincular compras apenas por e-mail coincidente. | E2 | ✅ Implementado localmente | Nenhuma junção por e-mail | — |  |  |
-| R10-08 | Parcela de cartão não é nova compra; distinguir captura, recebível e liquidação. | E2 | ⏳ Planejado | Parcelas/recebíveis/liquidação não modelados (T18) |  |  |  |
+| R10-06 | Upsell/downsell com outra transação gera registro próprio com vínculo ao pedido original quando comprovado. | E2 | ✅ Implementado localmente | orders.parent_order_id/parent_external_order_id (migração 0012); apps/worker/src/handlers/process-receipt.ts linkParentOrders (mesma conta lógica e projeto; resolução adiada quando o original chega depois); upsell herda vínculo por token do original (attribution.ts) | order-links-settlements.test.ts (T16) |  | Somente declaração explícita da origem (parent_order_id do contrato canônico). Lowify não documenta vínculo de upsell (DEP-LOWIFY-TRACKING) |
+| R10-07 | Não vincular compras apenas por e-mail coincidente. | E2 | ✅ Implementado localmente | Nenhuma junção por e-mail | order-links-settlements.test.ts (mesmo e-mail sem declaração e conta de outro provedor não vinculam) |  |  |
+| R10-08 | Parcela de cartão não é nova compra; distinguir captura, recebível e liquidação. | E2 | ✅ Implementado localmente | settlement.scheduled/paid/canceled no contrato canônico (adição compatível ao v1.0); tabela public.settlements fora do razão de receita; payment_transactions.installments informativo | order-links-settlements.test.ts (T18); financial.test.ts; canonical-meta.test.ts |  | Lowify não documenta parcelas/repasses; métricas por movimento financeiro ainda não exibem repasses |
 | R10-09 | Renovação de assinatura é receita nova separável da aquisição inicial. | E2 | ✅ Implementado localmente | packages/domain/src/financial/order-aggregate.ts; packages/db/migrations/0004 | packages/domain/test/financial.test.ts |  |  |
 | R10-10 | Estorno parcial preserva histórico e reduz líquido pela quantia efetiva. | E2 | ✅ Implementado localmente | packages/domain/src/financial/order-aggregate.ts; packages/db/migrations/0004 | packages/domain/test/financial.test.ts |  |  |
 | R10-11 | Chargeback, reembolso e reversão não subtraem o mesmo valor duas vezes. | E2 | ✅ Implementado localmente | packages/domain/src/financial/order-aggregate.ts; packages/db/migrations/0004 | packages/domain/test/financial.test.ts |  |  |
@@ -445,7 +445,7 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R21-06 | Detectar queda de eventos, ausência de vendas com tráfego, vendas sem origem crescendo, token expirado, fila acumulada e mudança de schema. | E3 | 🟡 Parcial | Alertas: quarentena, mortos, rejeições, fila, vendas sem origem, conexões degradadas | webhook-pipeline.test.ts |  |  |
 | R21-07 | Backfill com intervalo, prévia de volume, cota e rastreabilidade. | E3 | ⏳ Planejado | Backfill com prévia de volume |  | DEP-META-APP |  |
 | R21-08 | Importações históricas atualizam relatórios sem reenviar conversões. | E3 | ✅ Implementado localmente | Importações não disparam fanout (somente aprovações novas) | deliveries-relay.test.ts |  |  |
-| R21-09 | Evitar dupla contagem entre níveis campanha/conjunto/anúncio e breakdowns. | E3 | ✅ Implementado localmente | Um nível por conta; uma fonte por dia | — |  | Teste com níveis mistos pendente (T46) |
+| R21-09 | Evitar dupla contagem entre níveis campanha/conjunto/anúncio e breakdowns. | E3 | ✅ Implementado localmente | Um nível por conta e dia (o mais agregado disponível no dia); uma fonte por dia/entidade | breakdown-projects.test.ts (T46) |  |  |
 | R21-10 | Não somar alcance diário para alcance mensal; frequência não é soma de frequências. | E3 | ✅ Implementado localmente | Alcance só como dado bruto diário; frequência não somada | — |  |  |
 | R21-11 | Exibir fórmulas e denominadores; médias ponderadas com totais corretos. | E3 | ✅ Implementado localmente | Fórmula e denominador em cada card | E2E |  |  |
 | R21-12 | Snapshot/versão dos dados usados em exportações e avaliações de regras. | E3 | ⏳ Planejado | Snapshot versionado de exportações/regras |  |  |  |
@@ -477,8 +477,8 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R23-05 | Seletor métricas internas vs reportadas pelas redes, sem misturar. | E3 | 🟡 Parcial | Somente métricas internas; métricas das redes aguardam sincronização | — | DEP-META-APP |  |
 | R23-06 | Indicador de sincronização parcial, dados estimados e integrações com falha. | E3 | ✅ Implementado localmente | Qualidade parcial/estimada e alertas de integração no painel | E2E |  |  |
 | R23-07 | Cards configuráveis (investimento, receita, aprovadas, retidas, CPA, ROAS, ticket, estornos, contribuição, leads, vendas sem atribuição) qu… | E3 | ✅ Implementado localmente | Cards com definição e link para registros | E2E |  |  |
-| R23-08 | Gráficos: evolução receita/gasto/contribuição, vendas por hora/dia, composição por produto/canal, funil, qualidade da atribuição; sem empil… | E3 | 🟡 Parcial | Evolução diária, vendas por hora, qualidade da atribuição | E2E |  | Composição por produto/canal e funil pendentes |
-| R23-09 | Tabelas: colunas selecionáveis, ordenação, redimensionar, fixar, visões salvas, busca, paginação no servidor, filtros compostos, tags, tota… | E3 | 🟡 Parcial | Paginação por cursor no servidor, filtros, exportação | — |  |  |
+| R23-08 | Gráficos: evolução receita/gasto/contribuição, vendas por hora/dia, composição por produto/canal, funil, qualidade da atribuição; sem empil… | E3 | 🟡 Parcial | Evolução diária, vendas por hora, qualidade da atribuição; composição por rede/campanha/conjunto/anúncio em /v1/reports/breakdown e tela Campanhas | E2E; breakdown-projects.test.ts |  | Composição por produto e funil pendentes |
+| R23-09 | Tabelas: colunas selecionáveis, ordenação, redimensionar, fixar, visões salvas, busca, paginação no servidor, filtros compostos, tags, tota… | E3 | 🟡 Parcial | Paginação por cursor, filtros, exportação; detalhamento hierárquico campanha → anúncio com totais corretos (gasto total vs detalhado explicitados) | breakdown-projects.test.ts (T46 drill-down) |  | Colunas selecionáveis, visões salvas e tags pendentes |
 | R23-10 | Múltiplos dashboards (produto, cliente, projeto, consolidado autorizado), modelos, duplicação, ordem de widgets e compartilhamento controla… | E3 | ⏳ Planejado | Múltiplos dashboards salvos |  |  |  |
 | R23-11 | Metas e alertas de receita, contribuição, gasto, CPA, ROAS; notificações informam o que mudou. | E3 | ⏳ Planejado | Metas e alertas |  |  |  |
 
@@ -497,7 +497,7 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 
 | ID | Requisito | Etapa | Estado | Implementação | Testes | Dependência | Observação |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| R25-01 | Consultar/filtrar campanhas, conjuntos/grupos e anúncios nas redes implementadas. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-META-APP |  |
+| R25-01 | Consultar/filtrar campanhas, conjuntos/grupos e anúncios nas redes implementadas. | E6 | 🟡 Parcial | Consulta somente leitura de campanhas/conjuntos/anúncios a partir de gastos importados e IDs declarados (apps/web/app/(app)/campanhas; /v1/reports/breakdown) | breakdown-projects.test.ts; E2E T70 | DEP-META-APP | Consulta direta na API da rede e filtros por status dependem do app Meta |
 | R25-02 | Pausar, ativar, renomear e editar campos permitidos. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-META-APP |  |
 | R25-03 | Orçamento absoluto/percentual respeitando unidade, moeda, mínimo, teto e nível (CBO/ABO). | E6 | ⏳ Planejado | Etapa E6 |  | DEP-META-APP |  |
 | R25-04 | Ações em lote com resultado por item, sem repetir concluídos. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-META-APP |  |

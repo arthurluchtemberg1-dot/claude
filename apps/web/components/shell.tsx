@@ -36,6 +36,7 @@ export function useSession(): SessionValue {
 const NAV: { href: string; label: string; status?: "planned" }[] = [
   { href: "/painel", label: "Visão geral" },
   { href: "/vendas", label: "Vendas" },
+  { href: "/campanhas", label: "Campanhas" },
   { href: "/integracoes", label: "Integrações" },
   { href: "/instalacao", label: "Instalação do SDK" },
   { href: "/origem", label: "Origem e UTMs" },
@@ -43,7 +44,6 @@ const NAV: { href: string; label: string; status?: "planned" }[] = [
   { href: "/custos", label: "Custos e mídia" },
   { href: "/diagnostico", label: "Diagnóstico" },
   { href: "/configuracoes", label: "Configurações" },
-  { href: "/modulos/campanhas", label: "Campanhas", status: "planned" },
   { href: "/modulos/automacao", label: "Automação", status: "planned" },
   { href: "/modulos/ia", label: "Gestor IA", status: "planned" },
   { href: "/modulos/whatsapp-crm", label: "WhatsApp e CRM", status: "planned" },

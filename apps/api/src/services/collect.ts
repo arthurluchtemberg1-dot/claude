@@ -1,4 +1,4 @@
-import { classifyTouch, extractClickIds, referrerHost, sanitizeUrl, sanitizedToString } from "@tracker/domain";
+import { classifyTouch, declaredIdsFromUtm, extractClickIds, referrerHost, sanitizeUrl, sanitizedToString } from "@tracker/domain";
 import { withTx } from "@tracker/db";
 import { z } from "zod";
 import type { AppDeps } from "../context";
@@ -83,7 +83,9 @@ export async function collect(deps: AppDeps, payload: CollectPayload, meta: { ip
       term: landing.params.utm_term ?? null,
     };
     const landingHost = new URL(landing.origin).hostname;
-    const cls = classifyTouch({ utmSource: utm.source, utmMedium: utm.medium, utmCampaign: utm.campaign, clickIds, referrerHost: refHost, landingHost });
+    // IDs declarados em templates "nome|id" (validados depois, na atribuição, contra entidades da organização).
+    const ids = declaredIdsFromUtm(utm);
+    const cls = classifyTouch({ utmSource: utm.source, utmMedium: ids.mediumIsPair ? null : utm.medium, utmCampaign: utm.campaign, clickIds, referrerHost: refHost, landingHost });
 
     const earliest = payload.events.reduce((m, e) => Math.min(m, e.ts), now.getTime());
     const firstSeen = new Date(Math.max(earliest, now.getTime() - 24 * 3600_000));
@@ -122,10 +124,13 @@ export async function collect(deps: AppDeps, payload: CollectPayload, meta: { ip
     if (session.inserted) {
       await c.query(
         `insert into public.touchpoints (organization_id, project_id, visitor_id, session_id, occurred_at, channel, is_paid, network, evidence,
-            utm_source, utm_medium, utm_campaign, utm_content, utm_term, click_ids, declared, classification_reason)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,'session',$9,$10,$11,$12,$13,$14,false,$15)
+            utm_source, utm_medium, utm_campaign, utm_content, utm_term, click_ids, declared, classification_reason, campaign_id, adset_id, ad_id)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,'session',$9,$10,$11,$12,$13,$14,false,$15,$16,$17,$18)
          on conflict do nothing`,
-        [orgId, projectId, visitorId, session.id, session.started_at, cls.channel, cls.isPaid, cls.network, utm.source, utm.medium, utm.campaign, utm.content, utm.term, JSON.stringify(clickIds), cls.reason],
+        [
+          orgId, projectId, visitorId, session.id, session.started_at, cls.channel, cls.isPaid, cls.network, utm.source, utm.medium, utm.campaign, utm.content, utm.term,
+          JSON.stringify(clickIds), cls.reason, ids.campaignId, ids.adsetId, ids.adId,
+        ],
       );
       await c.query("insert into public.consent_records (organization_id, project_id, visitor_id, analytics, advertising, storage, source) values ($1,$2,$3,$4,$5,$6,'sdk')", [
         orgId, projectId, visitorId, payload.consent.analytics, payload.consent.ads, payload.consent.storage,

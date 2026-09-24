@@ -61,6 +61,11 @@ export interface TransactionState {
   orgShareMinor: bigint | null;
   /** Taxa efetiva informada pela origem. null = não informada. */
   feeMinor: bigint | null;
+  /**
+   * Número de parcelas da cobrança no cartão (informativo). Parcelas não são novas compras: a receita é a da
+   * aprovação; recebíveis e liquidações são registrados à parte, sem efeito de receita (R10-08, T18).
+   */
+  installments: number | null;
 }
 
 export interface ReversalState {
@@ -138,6 +143,7 @@ export type FinancialEvent =
       readonly kind: TransactionKind;
       readonly orgShareMinor?: bigint | null;
       readonly feeMinor?: bigint | null;
+      readonly installments?: number | null;
     }
   | {
       readonly type: "refund.succeeded";

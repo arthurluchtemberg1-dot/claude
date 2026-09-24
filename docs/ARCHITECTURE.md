@@ -55,9 +55,15 @@ Estado em 24/09/2026. Decisões e alternativas: [`DECISIONS.md`](DECISIONS.md).
 4. Uma transação: `webhook_receipts` (`ON CONFLICT` incrementa `delivery_count`) + `outbox receipt.process`. Resposta 200 após commit; erro de banco → 503.
 5. Worker: lock do pedido (`SELECT … FOR UPDATE`), carrega agregado, aplica eventos do domínio, grava transações/reversões/itens/razão (`ON CONFLICT DO NOTHING` por chave semântica), conflitos, contato restrito, evento normalizado sem PII, e cria `attribution.compute` e `destinations.fanout` (este somente para transações aprovadas pela primeira vez). Tudo na mesma transação que marca a outbox como concluída.
 
+Upsell/downsell com `parent_order_id` declarado é vinculado ao original da mesma conta e projeto, inclusive quando o original chega depois (D-017). Recebíveis e liquidações (`settlement.*`) vão para `public.settlements`, fora do razão de receita (D-016).
+
 ## Atribuição (seção 16)
 
-Hierarquia: token do SDK devolvido pelo checkout (liga pedido→visitante) > origem declarada pelo checkout (UTMs; IDs "nome|id" validados contra entidades da própria organização) > sessões. Com vínculo por token, a origem declarada vira corroboração. Tolerância de desvio de relógio de 10 min entre checkout e servidor. Cada política ativa gera um resultado versionado; recálculo marca o anterior como não corrente e nunca dispara Purchase.
+Hierarquia: token do SDK devolvido pelo checkout (liga pedido→visitante; upsell sem token herda o vínculo do pedido original) > origem declarada pelo checkout (UTMs; IDs "nome|id" validados contra entidades da própria organização) > sessões. Com vínculo por token, a origem declarada vira corroboração. Tolerância de desvio de relógio de 10 min entre checkout e servidor. Cada política ativa gera um resultado versionado; recálculo marca o anterior como não corrente e nunca dispara Purchase.
+
+## Métricas e detalhamentos
+
+`apps/api/src/services/metrics-repo.ts` produz somas/contagens com um único escopo de pedidos (`orderScopeSql`) e uma única regra de gasto (`chosenSpendSql`: uma fonte por entidade/dia e um nível por conta/dia); fórmulas ficam no domínio. `services/breakdown.ts` (`GET /v1/reports/breakdown`) agrega gasto e créditos de atribuição separadamente e só então combina por ID externo (campanha/conjunto/anúncio/rede), com frações exatas arredondadas na saída; gasto sem ID é `indisponível`, nunca zero, e o gasto não detalhável no nível é explicitado.
 
 ## Destinos de conversão (seção 17)
 

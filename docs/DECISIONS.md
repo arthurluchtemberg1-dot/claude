@@ -55,3 +55,13 @@ Formato: decisão · contexto · alternativas rejeitadas · consequências. Reve
 
 ## D-015 — Separação de dados de teste e demonstração
 - `connections.environment=test` marca vendas como teste (fora das métricas por padrão, não enviadas a destinos de produção). `organizations.is_demo` impede qualquer envio externo.
+
+## D-016 — Recebíveis e liquidações fora do razão de receita
+- Contrato canônico ganhou `settlement.scheduled|paid|canceled` e `order.installments` como adição compatível ao v1.0 (campos opcionais, tipos novos). Registros vão para `public.settlements`, nunca para `financial_entries`: parcela, recebível ou repasse não é nova compra nem receita (R10-08, T18). Exibição por movimento de caixa fica para quando houver fonte real (nenhum checkout integrado documenta repasses).
+
+## D-017 — Vínculo de upsell somente por declaração da origem, com resolução adiada
+- `parent_order_id` do contrato vincula pedidos da mesma conta lógica e projeto; se o original ainda não chegou, o ID externo fica guardado e o vínculo é resolvido na chegada dele. Declaração posterior divergente não troca o vínculo (conflito `parent_mismatch`). O upsell sem vínculo próprio herda os visitantes vinculados por token ao original (evidência `parent_order`, mesma força do token); nunca por e-mail.
+
+## D-018 — Gasto: um nível por conta **e por dia**; entidades importadas por CSV
+- Antes o nível era escolhido por conta no período inteiro, o que descartava dias importados em outro nível. Agora o total usa o nível mais agregado disponível em cada dia; o detalhamento por campanha usa o nível mais agregado abaixo da conta e explicita o gasto não detalhável.
+- A importação CSV registra entidades (`ad_entities.source = 'csv'`) e o histórico de nomes com datas da conta; o nome exibido é o de observação mais recente e a junção é sempre por ID (T39). Correção junto: o papel da API não tinha permissão de escrita em `ad_entity_names`, o que fazia falhar toda importação por campanha com nomes.

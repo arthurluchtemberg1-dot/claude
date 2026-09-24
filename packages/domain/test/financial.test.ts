@@ -51,6 +51,22 @@ const sumLedger = (ledger: LedgerEntry[], types: LedgerEntry["type"][]) =>
   ledger.filter((l) => types.includes(l.type)).reduce((a, l) => a + l.amountMinor, 0n);
 
 describe("agregado financeiro do pedido", () => {
+  it("T18 parcelas: aprovação parcelada conta uma vez; notificações repetidas não criam receita", () => {
+    const { state, ledger, results } = run([
+      approved("tx1", 30000n, 0, { method: "credit_card", installments: 3 }),
+      approved("tx1", 30000n, 30 * 24 * 60, { installments: 3 }),
+      approved("tx1", 30000n, 60 * 24 * 60),
+    ]);
+    expect(sumLedger(ledger, ["approval"])).toBe(30000n);
+    expect(ledger).toHaveLength(1);
+    expect(state.transactions.tx1!.installments).toBe(3);
+    expect(results.slice(1).every((r) => r.noop && r.newlyApproved.length === 0)).toBe(true);
+    // Parcelas informadas só depois da aprovação completam o dado sem gerar lançamento.
+    const late = run([approved("tx2", 1000n), approved("tx2", 1000n, 1, { installments: 2 })]);
+    expect(late.state.transactions.tx2!.installments).toBe(2);
+    expect(late.ledger).toHaveLength(1);
+  });
+
   it("T01 pagamento aprovado gera uma venda com valor correto", () => {
     const { state, ledger, results } = run([approved("tx1", 1799n)]);
     expect(ledger).toHaveLength(1);

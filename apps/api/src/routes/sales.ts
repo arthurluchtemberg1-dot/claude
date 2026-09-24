@@ -87,9 +87,9 @@ export const salesRoutes =
         const o = (await c.query("select * from public.orders where id = $1", [id])).rows[0];
         if (!o) throw notFound("Pedido não encontrado");
         assertProjectAccess(org, o.project_id);
-        const [items, txs, revs, ledger, conflicts, events, attributions, touches, deliveries, contact, receipts] = await inSequence([
+        const [items, txs, revs, ledger, conflicts, events, attributions, touches, deliveries, contact, receipts, related, settlements, links] = await inSequence([
           () => c.query("select item_key, external_product_id, product_id, name, item_type, unit_amount_minor, quantity, currency from public.order_items where order_id = $1 order by item_key", [id]),
-          () => c.query("select transaction_key, kind, status, amount_minor, currency, method, approved_at, status_occurred_at, reversed_net_minor, org_share_minor, fee_minor from public.payment_transactions where order_id = $1 order by status_occurred_at", [id]),
+          () => c.query("select transaction_key, kind, status, amount_minor, currency, method, installments, approved_at, status_occurred_at, reversed_net_minor, org_share_minor, fee_minor from public.payment_transactions where order_id = $1 order by status_occurred_at", [id]),
           () => c.query("select reversal_key, kind, transaction_key, semantics, reported_amount_minor, effective_minor, restored_minor, status, occurred_at, related_key from public.reversals where order_id = $1 order by occurred_at", [id]),
           () => c.query("select semantic_key, entry_type, transaction_key, amount_minor, currency, occurred_at, recorded_at, revenue_kind, estimated from public.financial_entries where order_id = $1 order by occurred_at, id", [id]),
           () => c.query("select code, message, transaction_key, reversal_key, created_at, resolved_at from public.order_conflicts where order_id = $1 order by created_at", [id]),
@@ -99,6 +99,14 @@ export const salesRoutes =
           () => c.query("select d.id, d.event_name, d.event_id, d.environment, d.status, d.not_eligible_reason, d.attempts, d.last_http_status, d.last_provider_code, d.last_trace_id, d.last_error, d.updated_at, cd.name as destination from public.destination_deliveries d join public.conversion_destinations cd on cd.id = d.destination_id where d.order_id = $1", [id]),
           () => c.query("select email, phone, name, source, retention_until from public.order_contacts where order_id = $1", [id]),
           () => c.query("select r.id, r.received_at, r.source_event_type, r.status, r.status_reason, r.delivery_count, r.dedup_method from public.webhook_receipts r where r.id in (select receipt_id from public.normalized_events where order_id = $1) order by r.received_at", [id]),
+          // Pedido original e upsells/downsells vinculados pela origem (T16).
+          () => c.query(
+            `select id, external_order_id, financial_status, approved_minor, currency, first_approved_at, case when id = $2 then 'parent' else 'child' end as relation
+               from public.orders where id = $2 or parent_order_id = $1 order by first_approved_at nulls last`,
+            [id, o.parent_order_id],
+          ),
+          () => c.query("select settlement_key, stage, transaction_key, installment_number, installment_count, gross_minor, fee_minor, net_minor, currency, anticipated, expected_at, occurred_at from public.settlements where order_id = $1 order by coalesce(expected_at, occurred_at), installment_number nulls last, stage", [id]),
+          () => c.query("select visitor_id, evidence, inherited_from_order_id, linked_at from public.order_visitor_links where order_id = $1", [id]),
         ] as const);
         let customer = null;
         const ct = contact.rows[0];
@@ -123,6 +131,11 @@ export const salesRoutes =
           attributions: attributions.rows,
           touchpoints: touches.rows,
           deliveries: deliveries.rows,
+          parent_order: related.rows.find((r) => r.relation === "parent") ?? null,
+          child_orders: related.rows.filter((r) => r.relation === "child"),
+          // Recebíveis/liquidações: informativos, nunca somados à receita (T18).
+          settlements: settlements.rows,
+          visitor_links: links.rows,
           customer,
         });
       });

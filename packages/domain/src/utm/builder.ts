@@ -195,3 +195,26 @@ export function parseNameIdPair(value: string | null | undefined, separator = "|
   if (!id || findUnexpandedMacros(id).length || /\s/.test(id) || id.length > 64) return { name, id: null };
   return { name, id };
 }
+
+const DECLARED_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * IDs de mídia declarados em UTMs no formato "nome|id" (templates do gerador de URLs): campanha em utm_campaign,
+ * anúncio em utm_content e conjunto em utm_medium (convenção comum de ferramentas de rastreamento) ou utm_term
+ * (preset do gerador). São DECLARATÓRIOS: só comprovam mídia paga após validação contra entidades da própria
+ * organização. Tokens do rastreador (trk_…) e macros não expandidas nunca viram ID.
+ */
+export function declaredIdsFromUtm(utm: { campaign?: string | null; medium?: string | null; content?: string | null; term?: string | null }): {
+  campaignId: string | null;
+  adsetId: string | null;
+  adId: string | null;
+  /** utm_medium carrega "nome|id" (não é um canal). */
+  mediumIsPair: boolean;
+} {
+  const idOf = (v: string | null | undefined) => {
+    const id = parseNameIdPair(v).id;
+    return id && DECLARED_ID_RE.test(id) && !id.startsWith("trk_") ? id : null;
+  };
+  const mediumId = idOf(utm.medium);
+  return { campaignId: idOf(utm.campaign), adsetId: mediumId ?? idOf(utm.term), adId: idOf(utm.content), mediumIsPair: !!mediumId };
+}

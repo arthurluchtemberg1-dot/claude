@@ -22,6 +22,10 @@ export const INTERNAL_EVENT_TYPES = [
   "chargeback.confirmed",
   "subscription.renewed",
   "subscription.canceled",
+  // Recebíveis e liquidações (repasses) — adição compatível ao v1.0: nunca geram receita nem nova compra (R10-08, T18).
+  "settlement.scheduled",
+  "settlement.paid",
+  "settlement.canceled",
   "lead.created",
   "deal.won",
 ] as const;
@@ -68,6 +72,8 @@ const canonicalEventBase = z.object({
         transaction_kind: z.enum(["initial", "upsell", "downsell", "renewal", "manual"]).default("initial"),
         org_share_minor: amountMinor.nullish(),
         fee_minor: amountMinor.nullish(),
+        // Parcelas do cartão (informativo): a receita continua sendo o valor aprovado da cobrança.
+        installments: z.number().int().min(1).max(99).nullish(),
         is_test: z.boolean().default(false),
         items: z.array(canonicalItemSchema).max(200).default([]),
       })
@@ -84,6 +90,18 @@ const canonicalEventBase = z.object({
         external_dispute_id: opaqueId,
         amount_minor: amountMinor.nullish(),
         covers_refund_id: opaqueId.nullish(),
+      })
+      .nullish(),
+    settlement: z
+      .object({
+        external_settlement_id: opaqueId,
+        installment_number: z.number().int().min(1).max(99).nullish(),
+        installment_count: z.number().int().min(1).max(99).nullish(),
+        gross_amount_minor: amountMinor.nullish(),
+        fee_minor: amountMinor.nullish(),
+        net_amount_minor: amountMinor,
+        expected_at: z.iso.datetime({ offset: true }).nullish(),
+        anticipated: z.boolean().default(false),
       })
       .nullish(),
     attribution: z
@@ -112,7 +130,7 @@ const canonicalEventBase = z.object({
   });
 
 export const canonicalEventSchema = canonicalEventBase.superRefine((v, ctx) => {
-    const needsOrder = v.event_type.startsWith("payment.") || v.event_type.startsWith("refund.") || v.event_type.startsWith("dispute.") || v.event_type === "chargeback.confirmed" || v.event_type === "subscription.renewed";
+    const needsOrder = v.event_type.startsWith("settlement.") || v.event_type.startsWith("payment.") || v.event_type.startsWith("refund.") || v.event_type.startsWith("dispute.") || v.event_type === "chargeback.confirmed" || v.event_type === "subscription.renewed";
     if (needsOrder && !v.order) ctx.addIssue({ code: "custom", message: `${v.event_type} exige o objeto order`, path: ["order"] });
     if ((v.event_type === "payment.approved" || v.event_type === "subscription.renewed") && v.order && (v.order.amount_minor === null || v.order.amount_minor === undefined)) {
       // Sem valor não há venda aprovada: não adivinhar dinheiro (T20).
@@ -120,6 +138,14 @@ export const canonicalEventSchema = canonicalEventBase.superRefine((v, ctx) => {
     }
     if (v.event_type === "refund.succeeded" && !v.refund) ctx.addIssue({ code: "custom", message: "refund.succeeded exige refund", path: ["refund"] });
     if ((v.event_type === "chargeback.confirmed" || v.event_type === "dispute.won") && !v.dispute) ctx.addIssue({ code: "custom", message: `${v.event_type} exige dispute`, path: ["dispute"] });
+    if (v.event_type.startsWith("settlement.") && !v.settlement) ctx.addIssue({ code: "custom", message: `${v.event_type} exige settlement`, path: ["settlement"] });
+    const st = v.settlement;
+    if (st && st.installment_number && st.installment_count && st.installment_number > st.installment_count) {
+      ctx.addIssue({ code: "custom", message: "installment_number maior que installment_count", path: ["settlement", "installment_number"] });
+    }
+    if (v.order?.parent_order_id && v.order.parent_order_id === v.order.external_order_id) {
+      ctx.addIssue({ code: "custom", message: "parent_order_id não pode ser o próprio pedido", path: ["order", "parent_order_id"] });
+    }
   });
 
 export type CanonicalEvent = z.infer<typeof canonicalEventSchema>;

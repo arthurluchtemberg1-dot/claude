@@ -123,7 +123,8 @@ describe("jornada visita → token → checkout Lowify → atribuição (T29, T3
   it("T38 macro não expandida vinda do checkout não vira ID; T40 ID de outra organização não é validado", async () => {
     const other = await signupVerified(h, "other");
     await createOrg(other.client, "Outra Org");
-    await other.client.req("POST", "/v1/ad-accounts", { network: "meta", external_account_id: "act_other", name: "Outra", currency: "BRL", timezone: "America/Sao_Paulo" });
+    const created = await other.client.req("POST", "/v1/ad-accounts", { network: "meta", external_account_id: "act_other", name: "Outra", currency: "BRL", timezone: "America/Sao_Paulo" });
+    expect(created.statusCode, created.body).toBe(201);
     const otherOrgId = other.client.orgId!;
     const acc = (await h.admin.query("select id from public.ad_accounts where organization_id = $1", [otherOrgId])).rows[0].id;
     await h.admin.query("insert into public.ad_entities (organization_id, ad_account_id, level, external_id, name) values ($1, $2, 'campaign', '120000000000999', 'Campanha da outra org')", [otherOrgId, acc]);

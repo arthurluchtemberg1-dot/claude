@@ -61,6 +61,34 @@ describe("webhook canônico assinado", () => {
     expect(canonicalConnector.normalize({ ...event, order: { ...event.order, amount_minor: 17.99 } }, { config: {}, receivedAt: now, connectionEnvironment: "production" }).status).toBe("quarantine");
   });
 
+  it("T16/T18 parent_order_id e recebíveis normalizados sem lançamento de receita", () => {
+    const ctx = { config: {}, receivedAt: now, connectionEnvironment: "production" as const };
+    const up = canonicalConnector.normalize({ ...event, order: { ...event.order, external_order_id: "PED-2", external_transaction_id: "CHG-2", parent_order_id: "PED-1", transaction_kind: "upsell", installments: 6 } }, ctx);
+    expect(up.status).toBe("ok");
+    if (up.status !== "ok") return;
+    expect(up.events[0]!.parentExternalOrderId).toBe("PED-1");
+    expect(up.events[0]!.financial.find((f) => f.type === "payment.approved")).toMatchObject({ kind: "upsell", installments: 6 });
+
+    const st = canonicalConnector.normalize(
+      {
+        ...event,
+        event_type: "settlement.scheduled",
+        order: { external_order_id: "PED-1", external_transaction_id: "CHG-1", currency: "BRL" },
+        settlement: { external_settlement_id: "REC-1", installment_number: 1, installment_count: 6, net_amount_minor: 280, expected_at: "2026-10-24T00:00:00-03:00" },
+      },
+      ctx,
+    );
+    expect(st.status).toBe("ok");
+    if (st.status !== "ok") return;
+    expect(st.events[0]!.financial).toEqual([]);
+    expect(st.events[0]!.settlements).toEqual([
+      expect.objectContaining({ settlementKey: "settlement:REC-1", stage: "scheduled", transactionKey: "CHG-1", installmentNumber: 1, installmentCount: 6, netMinor: 280n, grossMinor: null }),
+    ]);
+    const bad = { ...event, event_type: "settlement.paid", settlement: { external_settlement_id: "R", installment_number: 7, installment_count: 6, net_amount_minor: 1 } };
+    expect(canonicalConnector.normalize(bad, ctx).status).toBe("quarantine");
+    expect(canonicalConnector.normalize({ ...event, order: { ...event.order, parent_order_id: "PED-1" } }, ctx).status).toBe("quarantine");
+  });
+
   it("dedup por source.event_id", () => {
     expect(canonicalConnector.dedupIdentity(event, { rawBody: raw, headers: {}, receivedAt: now })).toMatchObject({ key: "evt:evt-1", method: "provider_event_id" });
   });

@@ -15,6 +15,7 @@ import { ingestRoutes } from "./routes/ingest";
 import { connectionRoutes } from "./routes/connections";
 import { salesRoutes } from "./routes/sales";
 import { metricsRoutes } from "./routes/metrics";
+import { reportRoutes } from "./routes/reports";
 import { diagnosticsRoutes } from "./routes/diagnostics";
 import { destinationRoutes } from "./routes/destinations";
 import { costRoutes } from "./routes/costs";
@@ -97,6 +98,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(connectionRoutes(deps), { prefix: "/v1" });
   await app.register(salesRoutes(deps), { prefix: "/v1" });
   await app.register(metricsRoutes(deps), { prefix: "/v1" });
+  await app.register(reportRoutes(deps), { prefix: "/v1" });
   await app.register(diagnosticsRoutes(deps), { prefix: "/v1" });
   await app.register(destinationRoutes(deps), { prefix: "/v1" });
   await app.register(costRoutes(deps), { prefix: "/v1" });

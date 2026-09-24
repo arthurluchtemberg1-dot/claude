@@ -3,8 +3,8 @@ import type { PoolClient } from "@tracker/db";
 import {
   attribute,
   classifyTouch,
+  declaredIdsFromUtm,
   hasUnexpandedMacro,
-  parseNameIdPair,
   type AttributionModel,
   type AttributionTouchpoint,
   type ClickIdKey,
@@ -46,7 +46,7 @@ function rowToTouch(r: Record<string, any>, evidenceOverride?: AttributionTouchp
 }
 
 export async function computeAttribution(c: PoolClient, deps: AttributionDeps, orgId: string, orderId: string, now: Date) {
-  const order = (await c.query("select id, project_id, first_approved_at, declared_tracking from public.orders where organization_id = $1 and id = $2 for update", [orgId, orderId])).rows[0];
+  const order = (await c.query("select id, project_id, first_approved_at, declared_tracking, parent_order_id from public.orders where organization_id = $1 and id = $2 for update", [orgId, orderId])).rows[0];
   if (!order || !order.first_approved_at) return { status: "skipped" as const, reason: "Pedido sem aprovação" };
   const conversionAt: Date = order.first_approved_at;
   const declared = order.declared_tracking ?? {};
@@ -75,6 +75,25 @@ export async function computeAttribution(c: PoolClient, deps: AttributionDeps, o
     }
   }
 
+  // 1b) Upsell/downsell com vínculo comprovado pela origem e sem vínculo próprio: herda os visitantes vinculados ao
+  // pedido original (R10-06, T16). Vínculo próprio (token do próprio pedido) sempre prevalece.
+  const ownLinks = (
+    await c.query("select 1 from public.order_visitor_links where organization_id = $1 and order_id = $2 and evidence <> 'parent_order' limit 1", [orgId, orderId])
+  ).rows.length;
+  if (ownLinks) {
+    await c.query("delete from public.order_visitor_links where organization_id = $1 and order_id = $2 and evidence = 'parent_order'", [orgId, orderId]);
+  } else if (order.parent_order_id) {
+    const inherited = await c.query(
+      `insert into public.order_visitor_links (organization_id, order_id, visitor_id, evidence, inherited_from_order_id)
+       select organization_id, $2, visitor_id, 'parent_order', $3 from public.order_visitor_links
+        where organization_id = $1 and order_id = $3 and evidence in ('token_link', 'parent_order')
+       on conflict do nothing returning visitor_id`,
+      [orgId, orderId, order.parent_order_id],
+    );
+    const total = (await c.query("select count(*)::int as n from public.order_visitor_links where organization_id = $1 and order_id = $2 and evidence = 'parent_order'", [orgId, orderId])).rows[0].n;
+    if (total > 0) notes.push(`Vínculo herdado do pedido original (upsell declarado pela origem)${inherited.rowCount ? "" : " já registrado"}`);
+  }
+
   // 2) Origem declarada pelo checkout (dado declaratório, R15-07). O token transportado num campo UTM não é origem.
   const u: Record<string, string | null> = { ...(declared.utm ?? {}) };
   if (typeof declared.trackingToken === "string") {
@@ -88,12 +107,10 @@ export async function computeAttribution(c: PoolClient, deps: AttributionDeps, o
     const clean = (v: unknown) => (typeof v === "string" && !hasUnexpandedMacro(v) ? v : null);
     const macroFields = ["source", "medium", "campaign", "content", "term"].filter((k) => typeof u[k] === "string" && hasUnexpandedMacro(u[k] as string));
     if (macroFields.length) notes.push(`UTMs com macro não expandida ignoradas: ${macroFields.join(", ")}`);
-    const campaign = parseNameIdPair(clean(u.campaign));
-    const adset = parseNameIdPair(clean(u.medium));
-    const ad = parseNameIdPair(clean(u.content));
-    const campaignId = declared.campaignId ?? campaign.id;
-    const adsetId = declared.adsetId ?? adset.id;
-    const adId = declared.adId ?? ad.id;
+    const ids = declaredIdsFromUtm({ campaign: clean(u.campaign), medium: clean(u.medium), content: clean(u.content), term: clean(u.term) });
+    const campaignId = declared.campaignId ?? ids.campaignId;
+    const adsetId = declared.adsetId ?? ids.adsetId;
+    const adId = declared.adId ?? ids.adId;
     // IDs só são validados contra entidades da própria organização (T40).
     let validated = false;
     const anyId = campaignId ?? adsetId ?? adId;
@@ -105,7 +122,7 @@ export async function computeAttribution(c: PoolClient, deps: AttributionDeps, o
       validated = !!v.rows[0];
     }
     const clickIds = (declared.clickIds ?? {}) as Partial<Record<ClickIdKey, string>>;
-    const cls = classifyTouch({ utmSource: clean(u.source), utmMedium: clean(u.medium) && !adset.id ? clean(u.medium) : null, utmCampaign: clean(u.campaign), clickIds });
+    const cls = classifyTouch({ utmSource: clean(u.source), utmMedium: ids.mediumIsPair ? null : clean(u.medium), utmCampaign: clean(u.campaign), clickIds });
     // Com template "nome|id" em utm_medium o medium não é canal; IDs de anúncio comprovam mídia paga somente se validados.
     const isPaid = cls.isPaid || (validated && !!anyId);
     await c.query(
@@ -129,6 +146,15 @@ export async function computeAttribution(c: PoolClient, deps: AttributionDeps, o
   const touchRows = linked.length ? [] : (await c.query("select * from public.touchpoints where organization_id = $1 and order_id = $2", [orgId, orderId])).rows;
   const touches: AttributionTouchpoint[] = touchRows.map((r) => rowToTouch(r));
   if (linked.length && hasDeclared) notes.push("Origem declarada pelo checkout registrada como corroboração do vínculo por token");
+  // IDs declarados nas UTMs das visitas vinculadas são validados agora contra entidades da organização (T40).
+  if (linked.length) {
+    await c.query(
+      `update public.touchpoints t set ids_validated = true
+        where t.organization_id = $1 and t.visitor_id = any($2) and t.evidence = 'session' and not t.ids_validated
+          and exists (select 1 from public.ad_entities e where e.organization_id = $1 and e.external_id in (t.campaign_id, t.adset_id, t.ad_id))`,
+      [orgId, linked.map((l) => l.visitor_id)],
+    );
+  }
   for (const l of linked) {
     const vt = await c.query("select * from public.touchpoints where organization_id = $1 and visitor_id = $2 and evidence = 'session' and occurred_at <= $3", [
       orgId,
@@ -136,7 +162,8 @@ export async function computeAttribution(c: PoolClient, deps: AttributionDeps, o
       new Date(conversionAt.getTime() + CLOCK_SKEW_MS),
     ]);
     for (const r of vt.rows) {
-      const t = rowToTouch(r, l.evidence);
+      // Vínculo herdado do pedido original deriva de um vínculo por token: mesma força de evidência.
+      const t = rowToTouch(r, l.evidence === "parent_order" ? "token_link" : l.evidence);
       // Toque dentro da tolerância de desvio de relógio é tratado como simultâneo à conversão.
       touches.push(t.occurredAt > conversionAt ? { ...t, occurredAt: conversionAt } : t);
     }
@@ -165,6 +192,22 @@ export async function computeAttribution(c: PoolClient, deps: AttributionDeps, o
       ],
     );
     results.push({ policy: p.policy_key, category: res.category });
+  }
+  // Upsells aprovados sem vínculo próprio são recalculados quando o pedido original ganha vínculos (sem Purchase, R16-07).
+  const parentLinks = (await c.query("select count(*)::int as n from public.order_visitor_links where organization_id = $1 and order_id = $2 and evidence in ('token_link', 'parent_order')", [orgId, orderId])).rows[0].n;
+  if (parentLinks > 0) {
+    const children = await c.query(
+      `select o.id from public.orders o
+        where o.organization_id = $1 and o.parent_order_id = $2 and o.first_approved_at is not null
+          and not exists (select 1 from public.order_visitor_links l where l.organization_id = $1 and l.order_id = o.id)`,
+      [orgId, orderId],
+    );
+    for (const ch of children.rows) {
+      await c.query(
+        "insert into public.outbox (organization_id, topic, payload, dedup_key, priority) values ($1, 'attribution.compute', $2, $3, 3) on conflict do nothing",
+        [orgId, JSON.stringify({ order_id: ch.id }), `attr:${ch.id}:parent-links:${orderId}:${parentLinks}`],
+      );
+    }
   }
   return { status: "computed" as const, results, notes };
 }

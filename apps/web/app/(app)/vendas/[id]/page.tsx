@@ -10,6 +10,8 @@ import { ATTRIBUTION_LABELS, STATUS_LABELS, dateTime, money } from "@/lib/format
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Detail = Record<string, any>;
 
+const SETTLEMENT_LABELS: Record<string, string> = { scheduled: "Recebível previsto", paid: "Liquidado", canceled: "Cancelado" };
+
 const ENTRY_LABELS: Record<string, string> = {
   approval: "Aprovação",
   refund: "Reembolso",
@@ -67,6 +69,32 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <p className="tabular text-xl font-semibold">{money(BigInt(o.approved_minor) - BigInt(o.reversed_minor), cur)}</p>
         </Card>
       </div>
+
+      {(data.parent_order || data.child_orders?.length > 0) && (
+        <Card title="Pedidos vinculados pela origem">
+          <p className="mb-2 text-xs text-muted">Vínculo declarado pelo checkout (upsell/downsell com outra transação). Cada pedido tem receita própria; nunca vinculado por e-mail.</p>
+          <Table headers={["Relação", "Pedido", "Status", "Aprovado", "Aprovado em"]}>
+            {[...(data.parent_order ? [data.parent_order] : []), ...(data.child_orders ?? [])].map((r: Detail) => (
+              <tr key={r.id}>
+                <Td>{r.relation === "parent" ? "Pedido original" : "Upsell/downsell"}</Td>
+                <Td>
+                  <Link className="font-mono text-xs text-primary underline" href={`/vendas/${r.id}`}>
+                    {r.external_order_id}
+                  </Link>
+                </Td>
+                <Td>{STATUS_LABELS[r.financial_status] ?? r.financial_status}</Td>
+                <Td className="tabular">{money(r.approved_minor, String(r.currency ?? "").trim())}</Td>
+                <Td className="tabular text-xs">{dateTime(r.first_approved_at, tz)}</Td>
+              </tr>
+            ))}
+          </Table>
+        </Card>
+      )}
+      {!data.parent_order && o.parent_external_order_id && (
+        <Alert tone="info" title="Pedido original declarado ainda não recebido">
+          O checkout informou o pedido original <span className="font-mono">{o.parent_external_order_id}</span>; o vínculo será feito quando ele chegar pela mesma conta.
+        </Alert>
+      )}
 
       {data.conflicts.length > 0 && (
         <Alert tone="warn" title="Conflitos registrados (nenhum valor foi alterado automaticamente)">
@@ -147,7 +175,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <tr key={t.transaction_key}>
                 <Td className="font-mono text-xs">{t.transaction_key}</Td>
                 <Td>
-                  {t.status} {t.kind !== "initial" && <Badge>{t.kind}</Badge>}
+                  {t.status} {t.kind !== "initial" && <Badge>{t.kind}</Badge>} {t.installments > 1 && <Badge tone="info">{t.installments}x</Badge>}
                 </Td>
                 <Td className="tabular">{money(t.amount_minor, t.currency)}</Td>
                 <Td>{t.method}</Td>
@@ -171,6 +199,27 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </Table>
         </Card>
       </div>
+
+      {data.settlements?.length > 0 && (
+        <Card title="Recebíveis e liquidações">
+          <p className="mb-2 text-xs text-muted">Informativo: parcelas, recebíveis e repasses não são novas vendas e não entram na receita.</p>
+          <Table headers={["Estágio", "Parcela", "Bruto", "Taxa", "Líquido", "Previsto", "Ocorrido"]}>
+            {data.settlements.map((st: Detail) => (
+              <tr key={`${st.settlement_key}-${st.stage}`}>
+                <Td>
+                  {SETTLEMENT_LABELS[st.stage] ?? st.stage} {st.anticipated && <Badge tone="info">antecipado</Badge>}
+                </Td>
+                <Td className="tabular">{st.installment_number ? `${st.installment_number}/${st.installment_count ?? "?"}` : "—"}</Td>
+                <Td className="tabular">{st.gross_minor === null ? "—" : money(st.gross_minor, st.currency)}</Td>
+                <Td className="tabular">{st.fee_minor === null ? "—" : money(st.fee_minor, st.currency)}</Td>
+                <Td className="tabular">{money(st.net_minor, st.currency)}</Td>
+                <Td className="tabular text-xs">{dateTime(st.expected_at, tz)}</Td>
+                <Td className="tabular text-xs">{dateTime(st.occurred_at, tz)}</Td>
+              </tr>
+            ))}
+          </Table>
+        </Card>
+      )}
 
       <Card title="Linha do tempo de recebimentos e eventos">
         <ol className="space-y-2 text-sm">

@@ -10,6 +10,7 @@ import type {
   InboundWebhook,
   NormalizeContext,
   NormalizeResult,
+  SettlementEvent,
 } from "../types";
 
 /**
@@ -68,7 +69,10 @@ export const canonicalManifest: ConnectorManifest = {
   apiVersion: "1.0",
   authentication: "HMAC-SHA256 com timestamp (X-Tracker-Signature) + token opaco na URL",
   scopes: [],
-  webhookEvents: ["payment.pending", "payment.approved", "payment.failed", "payment.canceled", "payment.expired", "refund.succeeded", "chargeback.confirmed", "dispute.won", "subscription.renewed"],
+  webhookEvents: [
+    "payment.pending", "payment.approved", "payment.failed", "payment.canceled", "payment.expired", "refund.succeeded", "chargeback.confirmed", "dispute.won",
+    "subscription.renewed", "settlement.scheduled", "settlement.paid", "settlement.canceled",
+  ],
   utmTransport: "attribution.tracking_token e UTMs no corpo",
   moneyField: "order.amount_minor (inteiro na menor unidade) + order.currency (ISO 4217)",
   timezone: "occurred_at ISO 8601 com offset",
@@ -82,6 +86,7 @@ export const canonicalManifest: ConnectorManifest = {
     subscriptions: { status: "supported", note: "subscription.renewed" },
     order_bump_items: { status: "supported", note: "order.items" },
     tracking_token_passthrough: { status: "supported", note: "attribution.tracking_token" },
+    reconciliation: { status: "supported", note: "settlement.* (recebíveis/liquidações sem efeito de receita)" },
   },
   tests: ["packages/connectors/test/canonical.test.ts", "apps/api/test/integration/webhook-pipeline.test.ts"],
   limitations: ["O emissor é responsável por enviar event_id estável por evento semântico."],
@@ -132,6 +137,7 @@ function toFinancial(e: CanonicalEvent): FinancialEvent[] | { quarantine: string
         kind: e.event_type === "subscription.renewed" ? "renewal" : o.transaction_kind,
         orgShareMinor: o.org_share_minor === null || o.org_share_minor === undefined ? null : BigInt(o.org_share_minor),
         feeMinor: o.fee_minor === null || o.fee_minor === undefined ? null : BigInt(o.fee_minor),
+        installments: o.installments ?? null,
       });
       break;
     case "refund.succeeded": {
@@ -172,11 +178,38 @@ function toFinancial(e: CanonicalEvent): FinancialEvent[] | { quarantine: string
       });
       break;
     }
+    case "settlement.scheduled":
+    case "settlement.paid":
+    case "settlement.canceled":
+      // Sem lançamento de receita: tratado à parte por toSettlements.
+      break;
     default:
       // refund.created, dispute.opened etc.: registrados sem efeito financeiro (não são confirmação).
       if (out.length === 0) return { ignored: `${e.event_type} registrado sem efeito financeiro` };
   }
   return out;
+}
+
+function toSettlements(e: CanonicalEvent): SettlementEvent[] {
+  if (!e.event_type.startsWith("settlement.") || !e.settlement || !e.order) return [];
+  const st = e.settlement;
+  const big = (v: number | null | undefined) => (v === null || v === undefined ? null : BigInt(v));
+  return [
+    {
+      settlementKey: `settlement:${st.external_settlement_id}`,
+      stage: e.event_type.slice("settlement.".length) as SettlementEvent["stage"],
+      transactionKey: e.order.external_transaction_id ?? `order:${e.order.external_order_id}`,
+      installmentNumber: st.installment_number ?? null,
+      installmentCount: st.installment_count ?? null,
+      grossMinor: big(st.gross_amount_minor),
+      feeMinor: big(st.fee_minor),
+      netMinor: BigInt(st.net_amount_minor),
+      currency: e.order.currency,
+      anticipated: st.anticipated,
+      expectedAt: st.expected_at ? new Date(st.expected_at) : null,
+      occurredAt: new Date(e.occurred_at),
+    },
+  ];
 }
 
 export const canonicalConnector: CheckoutConnector = {
@@ -227,6 +260,7 @@ export const canonicalConnector: CheckoutConnector = {
           isTest: e.order!.is_test || ctx.connectionEnvironment === "test",
           paymentMethod: e.order!.payment_method,
           financial: fin,
+          settlements: toSettlements(e),
           contact: e.customer ? { email: e.customer.email?.toLowerCase() ?? null, phone: e.customer.phone ?? null, name: e.customer.name ?? null } : null,
           declaredTracking: a
             ? {

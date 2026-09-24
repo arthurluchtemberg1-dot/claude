@@ -8,6 +8,7 @@ import {
   localDateRangeToUtc,
   parseDecimalToMinor,
   parseNameIdPair,
+  declaredIdsFromUtm,
   parseWallTimeInZone,
   previousLocalPeriod,
   readUtms,
@@ -87,6 +88,10 @@ describe("UTMs e links", () => {
     expect(issues.some((i) => i.code === "unexpanded_macro")).toBe(true);
     expect(parseNameIdPair("Campanha|{{campaign.id}}").id).toBeNull();
     expect(parseNameIdPair("Black Friday|120210000000001")).toEqual({ name: "Black Friday", id: "120210000000001" });
+    // Conjunto em utm_medium (convenção comum) ou utm_term (preset do gerador); token e macros nunca viram ID.
+    expect(declaredIdsFromUtm({ campaign: "BF|111", medium: "Conjunto|222", content: "Anúncio|333", term: "kw" })).toEqual({ campaignId: "111", adsetId: "222", adId: "333", mediumIsPair: true });
+    expect(declaredIdsFromUtm({ campaign: "BF|111", medium: "paid_social", term: "Conjunto|444" })).toMatchObject({ adsetId: "444", mediumIsPair: false });
+    expect(declaredIdsFromUtm({ term: "kw|trk_AbCdEfGhIjKlMnOpQrSt12", campaign: "{{campaign.name}}|{{campaign.id}}", content: "x|a b" })).toEqual({ campaignId: null, adsetId: null, adId: null, mediumIsPair: false });
   });
   it("sanitiza URL coletada sem guardar parâmetros sensíveis", () => {
     const s = sanitizeUrl("https://lp.exemplo.com/obrigado/joao@x.com?utm_source=fb&email=joao%40x.com&token=abc&fbclid=IwAR1#x");

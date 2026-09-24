@@ -122,6 +122,13 @@ test("T70 jornada completa: cadastro → conexão Lowify → visita com SDK → 
   await page.goto("/painel");
   await expect(page.getByRole("button", { name: /Receita bruta aprovada: R\$\s199,90/ })).toBeVisible();
 
+  // 6b. Campanhas: venda atribuída ao ID da campanha; sem gasto importado o gasto é "indisponível", nunca zero.
+  await page.goto("/campanhas");
+  const campaignRow = page.getByRole("row", { name: /ID 120000000000777/ });
+  await expect(campaignRow).toBeVisible();
+  await expect(campaignRow.getByText("indisponível")).toBeVisible();
+  await expect(campaignRow.getByText(/R\$\s199,90/)).toBeVisible();
+
   // 7. Estorno
   const refunded = await request.post(webhookUrl, { data: { ...documented, order_id: orderId, event: "sale.refunded", status: "refunded", timestamp: ts, tracking } });
   expect(refunded.status()).toBe(200);

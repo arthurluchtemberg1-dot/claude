@@ -190,9 +190,31 @@ export const costRoutes =
             [org.id, acc.project_id, acc.id, m.level, r.entity_id, r.campaign_id, r.date, acc.currency, BigInt(r.spend_minor), r.impressions, r.link_clicks, id],
           );
           if (m.level !== "account" && r.entity_name) {
+            // Histórico de nomes por data da conta: renomear não quebra a junção por ID (T39).
             await c.query(
-              "insert into public.ad_entity_names (organization_id, ad_account_id, level, external_id, name) values ($1,$2,$3,$4,$5) on conflict do nothing",
-              [org.id, acc.id, m.level, r.entity_id, r.entity_name],
+              `insert into public.ad_entity_names (organization_id, ad_account_id, level, external_id, name, first_seen_date, last_seen_date) values ($1,$2,$3,$4,$5,$6,$6)
+               on conflict (organization_id, ad_account_id, level, external_id, name) do update set
+                 first_seen_date = least(coalesce(public.ad_entity_names.first_seen_date, excluded.first_seen_date), excluded.first_seen_date),
+                 last_seen_date = greatest(coalesce(public.ad_entity_names.last_seen_date, excluded.last_seen_date), excluded.last_seen_date)`,
+              [org.id, acc.id, m.level, r.entity_id, r.entity_name, r.date],
+            );
+          }
+        }
+        if (m.level !== "account") {
+          // Entidades declaradas pela própria organização (fonte csv); nome vigente = o da data mais recente do arquivo.
+          const latest = new Map<string, SpendPreviewRow>();
+          for (const r of m.rows) {
+            const cur = latest.get(r.entity_id);
+            if (!cur || r.date > cur.date) latest.set(r.entity_id, r);
+          }
+          for (const r of latest.values()) {
+            await c.query(
+              `insert into public.ad_entities (organization_id, ad_account_id, level, external_id, parent_external_id, name, source)
+               values ($1,$2,$3,$4,$5,$6,'csv')
+               on conflict (organization_id, ad_account_id, level, external_id) do update set
+                 last_seen_at = now(), parent_external_id = coalesce(excluded.parent_external_id, public.ad_entities.parent_external_id),
+                 name = case when public.ad_entities.source = 'api' then public.ad_entities.name else coalesce(excluded.name, public.ad_entities.name) end`,
+              [org.id, acc.id, m.level, r.entity_id, m.level === "campaign" ? null : r.campaign_id, r.entity_name],
             );
           }
         }

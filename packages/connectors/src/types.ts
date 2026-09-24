@@ -131,6 +131,25 @@ export interface ContactData {
   readonly name: string | null;
 }
 
+/**
+ * Recebível/liquidação (repasse ao vendedor) informado pela origem. Registrado sem efeito de receita: parcela ou
+ * liquidação não é nova compra (R10-08, T18). Estágios: recebível previsto, liquidado, cancelado.
+ */
+export interface SettlementEvent {
+  readonly settlementKey: string;
+  readonly stage: "scheduled" | "paid" | "canceled";
+  readonly transactionKey: string;
+  readonly installmentNumber: number | null;
+  readonly installmentCount: number | null;
+  readonly grossMinor: bigint | null;
+  readonly feeMinor: bigint | null;
+  readonly netMinor: bigint;
+  readonly currency: string;
+  readonly anticipated: boolean;
+  readonly expectedAt: Date | null;
+  readonly occurredAt: Date;
+}
+
 export interface NormalizedOrderEvent {
   readonly schemaVersion: "1.0";
   readonly eventType: string;
@@ -141,6 +160,8 @@ export interface NormalizedOrderEvent {
   readonly isTest: boolean;
   readonly paymentMethod: string | null;
   readonly financial: readonly FinancialEvent[];
+  /** Recebíveis/liquidações (sem efeito de receita). Ausente = o provedor não informou. */
+  readonly settlements?: readonly SettlementEvent[];
   readonly contact: ContactData | null;
   readonly declaredTracking: DeclaredTracking | null;
   /** Observações de normalização (hipóteses usadas, campos ausentes). */

@@ -129,8 +129,11 @@ export const orgRoutes =
       return orgTx(deps, req, async (c, { auth, org }) => {
         const m = (await c.query("select user_id from public.memberships where id = $1", [id])).rows[0];
         if (!m) throw notFound("Membro não encontrado");
+        const ids = [...new Set(body.project_ids)];
+        const found = (await c.query("select count(*)::int as n from public.projects where id = any($1)", [ids])).rows[0].n;
+        if (found !== ids.length) throw badRequest("invalid_project", "Projeto inexistente nesta organização");
         await c.query("delete from public.project_memberships where user_id = $1", [m.user_id]);
-        for (const pid of body.project_ids) {
+        for (const pid of ids) {
           await c.query("insert into public.project_memberships (organization_id, project_id, user_id) values ($1, $2, $3)", [org.id, pid, m.user_id]);
         }
         await audit(c, { organizationId: org.id, actorId: auth.userId, action: "membership.projects_set", targetType: "membership", targetId: id, details: { project_ids: body.project_ids }, requestId: req.id });
