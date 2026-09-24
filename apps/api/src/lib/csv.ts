@@ -14,7 +14,7 @@ export function detectDelimiter(firstLine: string): "," | ";" | "\t" {
 }
 
 export function parseCsv(text: string, maxRows = 50_000): { header: string[]; rows: string[][] } {
-  const src = text.replace(/^﻿/, "");
+  const src = text.replace(/^\uFEFF/, "");
   const firstLineEnd = src.search(/\r?\n/);
   const delim = detectDelimiter(firstLineEnd >= 0 ? src.slice(0, firstLineEnd) : src);
   const records: string[][] = [];

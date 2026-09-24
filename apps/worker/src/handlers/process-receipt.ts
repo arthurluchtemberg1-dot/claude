@@ -1,6 +1,6 @@
 import { inSequence } from "@tracker/db";
 import { createHash } from "node:crypto";
-import { CHECKOUT_CONNECTORS, canonicalConnector, type NormalizedOrderEvent } from "@tracker/connectors";
+import { CHECKOUT_CONNECTORS, canonicalConnector, type DeclaredTracking, type NormalizedOrderEvent } from "@tracker/connectors";
 import type { PoolClient } from "@tracker/db";
 import {
   applyFinancialEvent,
@@ -144,6 +144,14 @@ async function ensureProducts(c: PoolClient, orgId: string, projectId: string, p
   }
 }
 
+/** Remove o token do rastreador de campos UTM declarados (o token completo não é exibido nem exportado, R15-08). */
+function maskTokenInUtm(d: DeclaredTracking): DeclaredTracking {
+  const token = d.trackingToken;
+  if (!token) return d;
+  const m = (v: string | null) => (typeof v === "string" ? v.split(token).join("[token]") : v);
+  return { ...d, utm: { source: m(d.utm.source), medium: m(d.utm.medium), campaign: m(d.utm.campaign), content: m(d.utm.content), term: m(d.utm.term) } };
+}
+
 function sanitizedCanonical(ev: NormalizedOrderEvent) {
   return {
     schema_version: ev.schemaVersion,
@@ -154,7 +162,7 @@ function sanitizedCanonical(ev: NormalizedOrderEvent) {
     is_test: ev.isTest,
     financial: ev.financial.map((f) => JSON.parse(JSON.stringify(f, (_k, v) => (typeof v === "bigint" ? v.toString() : v)))),
     declared_tracking: ev.declaredTracking
-      ? { ...ev.declaredTracking, trackingToken: ev.declaredTracking.trackingToken ? `…${ev.declaredTracking.trackingToken.slice(-4)}` : null }
+      ? { ...maskTokenInUtm(ev.declaredTracking), trackingToken: ev.declaredTracking.trackingToken ? `…${ev.declaredTracking.trackingToken.slice(-4)}` : null }
       : null,
     has_contact: !!ev.contact,
     notes: ev.notes,
@@ -241,7 +249,8 @@ export async function processReceipt(c: PoolClient, orgId: string, receiptId: st
     }
     const totals = orderTotals(state);
     const status = deriveOrderStatus(state);
-    const declared = order.declared_tracking && Object.keys(order.declared_tracking).length ? order.declared_tracking : ev.declaredTracking ?? {};
+    const incoming = ev.declaredTracking ? maskTokenInUtm(ev.declaredTracking) : {};
+    const declared = order.declared_tracking && Object.keys(order.declared_tracking).length ? order.declared_tracking : incoming;
     if (ev.declaredTracking?.trackingToken && !declared.trackingToken) declared.trackingToken = ev.declaredTracking.trackingToken;
     await c.query(
       `update public.orders set currency = $2, financial_status = $3, approved_minor = $4, reversed_minor = $5, first_approved_at = $6,

@@ -22,7 +22,7 @@ describe("dinheiro exato", () => {
     expect(parseDecimalToMinor("199.90", "BRL")).toBe(19990n);
     expect(parseDecimalToMinor("17.99", "BRL")).toBe(1799n);
     expect(jsonNumberToMinor(199.9, "BRL")).toBe(19990n);
-    expect(jsonNumberToMinor(0.1 + 0.2 === 0.3 ? 0.3 : 0.3, "BRL")).toBe(30n);
+    expect(jsonNumberToMinor(0.1 + 0.2, "BRL")).toBe(30n);
     expect(jsonNumberToMinor(1234.56, "BRL")).toBe(123456n);
     expect(formatMinorAsDecimal(-505n, "BRL")).toBe("-5.05");
     expect(parseDecimalToMinor("1500", "CLP")).toBe(1500n);

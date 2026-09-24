@@ -34,6 +34,8 @@
     "esbuild": "0.28.2",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "@tracker/worker": "workspace:*"
+    "@tracker/worker": "workspace:*",
+    "bullmq": "6.3.8",
+    "ioredis": "5.11.1"
   }
 }

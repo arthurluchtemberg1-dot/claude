@@ -67,6 +67,8 @@ const MAX_VALUE_LENGTH = 500;
 export function validateParamValue(key: string, value: string, opts: { allowMacros?: boolean } = {}): UrlIssue[] {
   const issues: UrlIssue[] = [];
   if (value.trim() === "") issues.push({ severity: "warning", code: "empty_value", param: key, message: `${key} vazio` });
+  // Caracteres de controle são rejeitados de propósito (regex intencional).
+  // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001f\u007f]/.test(value)) issues.push({ severity: "error", code: "control_chars", param: key, message: `${key} contém caracteres de controle` });
   if (value.length > MAX_VALUE_LENGTH) issues.push({ severity: "error", code: "too_long", param: key, message: `${key} excede ${MAX_VALUE_LENGTH} caracteres` });
   if (/%25[0-9a-f]{2}/i.test(value) || /%[0-9a-f]{2}/i.test(value)) {

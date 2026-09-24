@@ -13,7 +13,7 @@ const admin = new pg.Pool({ connectionString: TEST_DB.admin });
 const app = createPool(TEST_DB.app);
 const system = createPool(TEST_DB.system);
 
-let orgA: string, orgB: string, userA: string, userB: string, projectA: string, projectB: string;
+let orgA: string, orgB: string, userA: string, projectA: string, projectB: string;
 
 async function seedOrg(label: string) {
   const user = (await admin.query("insert into iam.users (email, password_hash, display_name) values ($1, 'x', $2) returning id", [`${label}-${randomUUID()}@teste.local`, label])).rows[0].id as string;
@@ -27,7 +27,7 @@ beforeAll(async () => {
   const a = await seedOrg("org-a");
   const b = await seedOrg("org-b");
   [orgA, userA, projectA] = [a.org, a.user, a.project];
-  [orgB, userB, projectB] = [b.org, b.user, b.project];
+  [orgB, projectB] = [b.org, b.project];
 });
 
 afterAll(async () => {

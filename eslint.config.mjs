@@ -26,6 +26,11 @@ export default tseslint.config(
     },
   },
   {
+    // Testes lidam com respostas JSON dinâmicas; `any` é aceitável somente neles.
+    files: ["**/test/**/*.ts", "test/**/*.ts"],
+    rules: { "@typescript-eslint/no-explicit-any": "off" },
+  },
+  {
     files: ["**/*.{js,mjs,cjs}"],
     languageOptions: {
       globals: { process: "readonly", console: "readonly", URL: "readonly", Buffer: "readonly" },

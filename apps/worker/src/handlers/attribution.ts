@@ -21,8 +21,13 @@ export interface AttributionDeps {
   tokenHmacKey: Buffer;
 }
 
+/** Tolerância de desvio de relógio entre o provedor de checkout e este servidor (horários com precisão de segundos). */
+export const CLOCK_SKEW_MS = 10 * 60_000;
+
 const hashToken = (key: Buffer, token: string) => createHmac("sha256", key).update(token).digest();
 
+// Linha do banco (colunas de public.touchpoints).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToTouch(r: Record<string, any>, evidenceOverride?: AttributionTouchpoint["evidence"]): AttributionTouchpoint {
   return {
     id: r.id,
@@ -58,8 +63,9 @@ export async function computeAttribution(c: PoolClient, deps: AttributionDeps, o
       )
     ).rows[0];
     if (!lt) notes.push("Token devolvido pelo checkout não pertence a este projeto ou não existe");
-    else if (lt.created_at > conversionAt || lt.expires_at < conversionAt) notes.push("Token fora da validade na data da conversão");
+    else if (lt.created_at.getTime() > conversionAt.getTime() + CLOCK_SKEW_MS || lt.expires_at < conversionAt) notes.push("Token fora da validade na data da conversão");
     else {
+      if (lt.created_at > conversionAt) notes.push("Desvio de relógio entre provedor e servidor tolerado (token emitido segundos após o horário informado pelo checkout)");
       visitorId = lt.visitor_id;
       await c.query(
         `insert into public.order_visitor_links (organization_id, order_id, visitor_id, evidence, link_token_id) values ($1, $2, $3, 'token_link', $4) on conflict do nothing`,
@@ -69,12 +75,18 @@ export async function computeAttribution(c: PoolClient, deps: AttributionDeps, o
     }
   }
 
-  // 2) Origem declarada pelo checkout (dado declaratório, R15-07).
-  const u = declared.utm ?? {};
+  // 2) Origem declarada pelo checkout (dado declaratório, R15-07). O token transportado num campo UTM não é origem.
+  const u: Record<string, string | null> = { ...(declared.utm ?? {}) };
+  if (typeof declared.trackingToken === "string") {
+    for (const k of Object.keys(u)) {
+      const v = u[k];
+      if (typeof v === "string" && (v.includes(declared.trackingToken) || v.includes("[token]"))) u[k] = v.replace(declared.trackingToken, "").replace("[token]", "").replace(/[|_\s-]+$/, "") || null;
+    }
+  }
   const hasDeclared = u.source || u.medium || u.campaign || u.content || u.term || declared.campaignId;
   if (hasDeclared) {
     const clean = (v: unknown) => (typeof v === "string" && !hasUnexpandedMacro(v) ? v : null);
-    const macroFields = ["source", "medium", "campaign", "content", "term"].filter((k) => typeof u[k] === "string" && hasUnexpandedMacro(u[k]));
+    const macroFields = ["source", "medium", "campaign", "content", "term"].filter((k) => typeof u[k] === "string" && hasUnexpandedMacro(u[k] as string));
     if (macroFields.length) notes.push(`UTMs com macro não expandida ignoradas: ${macroFields.join(", ")}`);
     const campaign = parseNameIdPair(clean(u.campaign));
     const adset = parseNameIdPair(clean(u.medium));
@@ -111,13 +123,23 @@ export async function computeAttribution(c: PoolClient, deps: AttributionDeps, o
     );
   }
 
-  // 3) Toques: origem declarada do pedido + sessões do visitante vinculado por token.
-  const touchRows = (await c.query("select * from public.touchpoints where organization_id = $1 and order_id = $2", [orgId, orderId])).rows;
-  const touches: AttributionTouchpoint[] = touchRows.map((r) => rowToTouch(r));
+  // 3) Toques. Hierarquia de evidência (R16-04): havendo vínculo por token, os toques do visitante vinculado são a
+  // evidência principal e a origem declarada pelo checkout fica apenas como corroboração (não compete como toque).
   const linked = (await c.query("select visitor_id, evidence from public.order_visitor_links where organization_id = $1 and order_id = $2", [orgId, orderId])).rows;
+  const touchRows = linked.length ? [] : (await c.query("select * from public.touchpoints where organization_id = $1 and order_id = $2", [orgId, orderId])).rows;
+  const touches: AttributionTouchpoint[] = touchRows.map((r) => rowToTouch(r));
+  if (linked.length && hasDeclared) notes.push("Origem declarada pelo checkout registrada como corroboração do vínculo por token");
   for (const l of linked) {
-    const vt = await c.query("select * from public.touchpoints where organization_id = $1 and visitor_id = $2 and evidence = 'session' and occurred_at <= $3", [orgId, l.visitor_id, conversionAt]);
-    for (const r of vt.rows) touches.push(rowToTouch(r, l.evidence));
+    const vt = await c.query("select * from public.touchpoints where organization_id = $1 and visitor_id = $2 and evidence = 'session' and occurred_at <= $3", [
+      orgId,
+      l.visitor_id,
+      new Date(conversionAt.getTime() + CLOCK_SKEW_MS),
+    ]);
+    for (const r of vt.rows) {
+      const t = rowToTouch(r, l.evidence);
+      // Toque dentro da tolerância de desvio de relógio é tratado como simultâneo à conversão.
+      touches.push(t.occurredAt > conversionAt ? { ...t, occurredAt: conversionAt } : t);
+    }
   }
   if (visitorId === null && linked.length === 0 && typeof declared.trackingToken !== "string") notes.push("Checkout não devolveu token do rastreador");
 

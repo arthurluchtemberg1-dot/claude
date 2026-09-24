@@ -1,0 +1,17 @@
+{
+  "name": "@tracker/tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "happy-dom": "20.14.5",
+    "typescript": "5.9.3",
+    "@types/node": "22.20.4"
+  }
+}
