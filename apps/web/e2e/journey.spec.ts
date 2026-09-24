@@ -129,6 +129,14 @@ test("T70 jornada completa: cadastro → conexão Lowify → visita com SDK → 
   await expect(campaignRow.getByText("indisponível")).toBeVisible();
   await expect(campaignRow.getByText(/R\$\s199,90/)).toBeVisible();
 
+  // 6c. Clientes (e-mail informado pelo checkout) e políticas de atribuição.
+  await page.goto("/clientes");
+  await page.getByRole("link", { name: "Cliente Exemplo" }).click();
+  await expect(page.getByRole("link", { name: orderId })).toBeVisible();
+  await page.goto("/atribuicao");
+  await expect(page.getByText("principal", { exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Último clique pago elegível", exact: true })).toBeVisible();
+
   // 7. Estorno
   const refunded = await request.post(webhookUrl, { data: { ...documented, order_id: orderId, event: "sale.refunded", status: "refunded", timestamp: ts, tracking } });
   expect(refunded.status()).toBe(200);

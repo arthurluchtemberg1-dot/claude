@@ -37,6 +37,8 @@ const NAV: { href: string; label: string; status?: "planned" }[] = [
   { href: "/painel", label: "Visão geral" },
   { href: "/vendas", label: "Vendas" },
   { href: "/campanhas", label: "Campanhas" },
+  { href: "/clientes", label: "Clientes" },
+  { href: "/atribuicao", label: "Atribuição" },
   { href: "/integracoes", label: "Integrações" },
   { href: "/instalacao", label: "Instalação do SDK" },
   { href: "/origem", label: "Origem e UTMs" },

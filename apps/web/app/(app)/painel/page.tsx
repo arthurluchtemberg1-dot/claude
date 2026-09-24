@@ -109,7 +109,9 @@ export default function DashboardPage() {
   const [open, setOpen] = useState<Metric | null>(null);
   const projects = useApi<{ projects: { id: string; name: string }[] }>("/v1/projects");
   const [projectId, setProjectId] = useState("");
-  const qs = `from=${from}&to=${to}&basis=${basis}&compare=${compare}${projectId ? `&project_id=${projectId}` : ""}`;
+  const [policy, setPolicy] = useState("default");
+  const policies = useApi<{ policies: { policy_key: string; current: { name: string } | null }[] }>("/v1/attribution/policies");
+  const qs = `from=${from}&to=${to}&basis=${basis}&compare=${compare}&policy=${policy}${projectId ? `&project_id=${projectId}` : ""}`;
   const summary = useApi<Summary>(`/v1/metrics/summary?${qs}`);
   const ts = useApi<Timeseries>(`/v1/metrics/timeseries?from=${from}&to=${to}${projectId ? `&project_id=${projectId}` : ""}`);
 
@@ -138,7 +140,7 @@ export default function DashboardPage() {
         }
       />
       <Card>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-7">
           <Field label="De">{(id) => <Input id={id} type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />}</Field>
           <Field label="Até">{(id) => <Input id={id} type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />}</Field>
           <Field label="Base temporal">
@@ -159,6 +161,19 @@ export default function DashboardPage() {
                     {p.name}
                   </option>
                 ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Atribuição">
+            {(id) => (
+              <Select id={id} value={policy} onChange={(e) => setPolicy(e.target.value)}>
+                {(policies.data?.policies ?? [{ policy_key: "default", current: { name: "Principal" } }])
+                  .filter((p) => p.current)
+                  .map((p) => (
+                    <option key={p.policy_key} value={p.policy_key}>
+                      {p.policy_key === "default" ? `Principal — ${p.current!.name}` : p.current!.name}
+                    </option>
+                  ))}
               </Select>
             )}
           </Field>

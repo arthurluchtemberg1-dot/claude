@@ -11,7 +11,7 @@
 - **E8 (parcial): API pública v1 e webhooks de saída implementados** — chaves com escopos/projetos/sandbox, limites, Idempotency-Key, OpenAPI, webhooks assinados com anti-SSRF, fila de falhas e proteção contra loops.
 - **E5–E7, E9, E10:** planejadas (catálogo completo com estados reais, sem stubs).
 
-Matriz: 215 requisitos implementados localmente, 79 parciais, 12 bloqueados externamente, 117 planejados, 13 de método/documento. Cenários T01–T70: 55 automatizados e executados, 2 parciais, 12 planejados, 1 bloqueado (ver [`REQUIREMENTS_TRACEABILITY.md`](REQUIREMENTS_TRACEABILITY.md)).
+Matriz: 217 requisitos implementados localmente, 78 parciais, 12 bloqueados externamente, 116 planejados, 13 de método/documento. Cenários T01–T70: 55 automatizados e executados, 2 parciais, 12 planejados, 1 bloqueado (ver [`REQUIREMENTS_TRACEABILITY.md`](REQUIREMENTS_TRACEABILITY.md)).
 
 ## Evidências (executadas nesta sessão)
 
@@ -19,8 +19,8 @@ Matriz: 215 requisitos implementados localmente, 79 parciais, 12 bloqueados exte
 | --- | --- | --- |
 | Lint | `pnpm lint` | sem erros |
 | Tipos | `pnpm typecheck` | sem erros (8 pacotes; conferir o código de saída — `pnpm -s` omite a saída do erro) |
-| Unitários + integração (PostgreSQL 16 e Redis 7 reais) | `pnpm test` | 202 testes passando (18 arquivos), 3 execuções seguidas sem falha |
-| E2E navegador (API + worker/BullMQ + painel, banco `tracker_e2e`) | `pnpm test:e2e` | 3 testes passando, incluindo T70 (com Campanhas e criação/uso/revogação de chave de API) |
+| Unitários + integração (PostgreSQL 16 e Redis 7 reais) | `pnpm test` | 205 testes passando (18 arquivos) |
+| E2E navegador (API + worker/BullMQ + painel, banco `tracker_e2e`) | `pnpm test:e2e` | 3 testes passando, incluindo T70 (com Campanhas, Clientes, Atribuição e criação/uso/revogação de chave de API) |
 | Build | `pnpm build` | API/worker empacotados (executados com `/health` e `/ready` OK), painel Next standalone, SDK 4,3 KiB gzip |
 | Fixture financeira obrigatória | domínio e via webhooks + API | valores exatos com webhooks repetidos 3× |
 
@@ -29,10 +29,10 @@ Defeitos reais encontrados e corrigidos pelos testes: corrida relay→worker (jo
 ## Entregue por módulo
 
 - **Domínio** (`packages/domain`): dinheiro exato, fuso/intervalos, agregado financeiro (pendente/aprovado/falho, reversões sem dupla dedução, disputa ganha, estorno antes da aprovação, renovação, participação da organização, parcelas informativas), registro de 25 métricas com qualidade/indefinido/indisponível, 7 modelos de atribuição, UTMs/macros, sanitização, permissões.
-- **Banco**: 14 migrações (0012 upsell/recebíveis, 0013 entidades/nomes por data, 0014 API pública/webhooks de saída); RLS em todas as tabelas de negócio; FKs compostas; razão somente leitura para a API; cofre de credenciais cifrado.
-- **API**: auth (cadastro, verificação, login, bloqueio, reset, MFA, sessões), organizações/membros/convites/projetos/auditoria, conexões e endpoints (URL exibida uma vez, rotação/revogação), ingestão de webhooks e coleta do SDK, vendas (lista/detalhe com pedidos vinculados e recebíveis/manual/exportação CSV), métricas (resumo/série), detalhamento por campanha/conjunto/anúncio/rede, API pública `/public/v1` (OpenAPI) e gestão de chaves/webhooks de saída, diagnóstico, destinos, custos/importação, UTMs, health/ready.
+- **Banco**: 15 migrações (0012 upsell/recebíveis, 0013 entidades/nomes por data, 0014 API pública/webhooks de saída, 0015 clientes); RLS em todas as tabelas de negócio; FKs compostas; razão somente leitura para a API; cofre de credenciais cifrado.
+- **API**: auth (cadastro, verificação, login, bloqueio, reset, MFA, sessões), organizações/membros/convites/projetos/auditoria, conexões e endpoints (URL exibida uma vez, rotação/revogação), ingestão de webhooks e coleta do SDK, vendas (lista/detalhe com pedidos vinculados e recebíveis/manual/exportação CSV), métricas (resumo/série), detalhamento por campanha/conjunto/anúncio/rede, API pública `/public/v1` (OpenAPI) e gestão de chaves/webhooks de saída, políticas de atribuição (versões, comparação, recálculo), clientes, diagnóstico, destinos, custos/importação, UTMs, health/ready.
 - **Worker**: relay, consumidor BullMQ, processamento de recebimentos (vínculo de upsell com resolução adiada, recebíveis/liquidações), atribuição versionada (herança do vínculo do pedido original), emissão e entrega de webhooks de saída, fanout e envio Meta CAPI com retry/circuit breaker, seed de demonstração.
-- **Painel**: entrada/onboarding, visão geral, vendas e detalhe (pedidos vinculados, parcelas, recebíveis), campanhas (detalhamento e drill-down), API e webhooks, integrações e catálogo, instalação do SDK, UTMs, pixels, custos, diagnóstico, configurações; módulos futuros identificados como planejados.
+- **Painel**: entrada/onboarding, visão geral, vendas e detalhe (pedidos vinculados, parcelas, recebíveis), campanhas (detalhamento e drill-down), clientes, atribuição (políticas e comparação; seletor no painel), API e webhooks, integrações e catálogo, instalação do SDK, UTMs, pixels, custos, diagnóstico, configurações; módulos futuros identificados como planejados.
 - **SDK**: consentimento, identificadores, toques, lotes/beacon, SPA, decoração de checkout, token, iframe.
 - **Ferramentas**: `pnpm diag`, `pnpm webhook:simulate`, `pnpm db:seed:demo`, `pnpm traceability`, `pnpm docs:metrics`.
 
@@ -56,8 +56,8 @@ Ver [`EXTERNAL_DEPENDENCIES.md`](EXTERNAL_DEPENDENCIES.md). Os que mais destrava
 
 ## Próximo passo executável
 
-1. Tela/API de políticas de atribuição (criar versão, janela, comparação) e visão de clientes.
-2. Dockerfiles (API, worker, painel), `docker-compose` de referência, backup/restore testado (T69) e checklist de implantação.
+1. Dockerfiles (API, worker, painel), `docker-compose` de referência, backup/restore testado (T69) e checklist de implantação.
+2. Base por coorte e LTV observado por cliente (R16-11, R22); contribuição por cliente.
 3. Após DEP-META-APP: OAuth Meta (state + PKCE), sincronização de contas/entidades/insights com paginação e backfill, validação CAPI com `test_event_code`.
 
 Para retomar: ler `CLAUDE.md`, este arquivo e a matriz; subir PostgreSQL/Redis (`service postgresql start`; `redis-server --daemonize yes --appendonly yes --dir /tmp`); `pnpm install && pnpm db:migrate && pnpm test`.

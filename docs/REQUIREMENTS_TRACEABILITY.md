@@ -8,10 +8,10 @@ Atualizado em: 2026-09-24. Estados de requisito conforme R11-03/R46-01: "Impleme
 
 | Estado | Requisitos |
 | --- | --- |
-| ✅ Implementado localmente | 215 |
-| 🟡 Parcial | 79 |
+| ✅ Implementado localmente | 217 |
+| 🟡 Parcial | 78 |
 | ⛔ Bloqueado externamente | 12 |
-| ⏳ Planejado | 117 |
+| ⏳ Planejado | 116 |
 | 📄 Método/documento | 13 |
 | **Total** | **436** |
 
@@ -355,13 +355,13 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 
 | ID | Requisito | Etapa | Estado | Implementação | Testes | Dependência | Observação |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| R16-01 | Políticas versionadas com comparação entre modelos: primeiro toque, último toque, último não direto, primeiro clique pago elegível, último … | E2 | 🟡 Parcial | 7 modelos; políticas versionadas; comparação entre políticas ativas | attribution.test.ts |  | 7 modelos e versões no banco; tela/API de gestão de políticas pendente |
-| R16-02 | Janelas configuráveis (1, 7, 14, 30 dias), internas, sem replicar configuração das redes. | E2 | 🟡 Parcial | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  | window_days 1–90 por política; edição pela interface pendente |
+| R16-01 | Políticas versionadas com comparação entre modelos: primeiro toque, último toque, último não direto, primeiro clique pago elegível, último … | E2 | ✅ Implementado localmente | Política principal (default) versionada + políticas de comparação (até 6 ativas); API /v1/attribution/* e tela Atribuição; comparação por categoria e receita creditada por rede; seletor de política no painel | attribution-customers.test.ts; attribution.test.ts; E2E |  |  |
+| R16-02 | Janelas configuráveis (1, 7, 14, 30 dias), internas, sem replicar configuração das redes. | E2 | ✅ Implementado localmente | Janelas 1/7/14/30 dias por política, editáveis por nova versão (histórico preservado) | attribution-customers.test.ts |  |  |
 | R16-03 | Aplicar pela data do toque e da conversão real, não do recebimento do webhook. | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  |  |
 | R16-04 | Hierarquia de evidência: token↔pedido; origem do checkout com IDs validados; sessão/visitante persistidos; identidade própria fornecida com… | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  |  |
 | R16-05 | IP, proximidade temporal, dispositivo ou valor não comprovam identidade; click IDs não são decodificados como se revelassem anúncio. | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  |  |
 | R16-06 | Persistir modelo, versão, janela, toque, IDs, tipo de evidência, qualidade, data do cálculo, motivo e origem manual. | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  |  |
-| R16-07 | Relatórios indicam recálculo; recalcular não muda o webhook nem reenvia Purchase. | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  |  |
+| R16-07 | Relatórios indicam recálculo; recalcular não muda o webhook nem reenvia Purchase. | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts; recálculo explícito por período (POST /v1/attribution/recompute, até 5000 vendas) sem Purchase | attribution.test.ts, tracking-attribution.test.ts; attribution-customers.test.ts |  |  |
 | R16-08 | Separar pago conhecido, orgânico conhecido, direto, recuperação, sem atribuição (ausente/inválido/expirado/conflitante). | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  |  |
 | R16-09 | Crédito de clique anterior após retorno pela bio conforme política/janela; exibir caminho observado; sem prometer paridade com a Meta. | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  |  |
 | R16-10 | Modelos fracionados: pesos somam 1; receita não multiplica; "conversões creditadas" ≠ pedidos inteiros. | E2 | ✅ Implementado localmente | packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts | attribution.test.ts, tracking-attribution.test.ts |  |  |
@@ -489,7 +489,7 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R24-01 | Lista de vendas: busca por pedido, filtros, origem, valores, taxas, status, método, produto, oferta, cupom, afiliado, histórico; dados pess… | E2/E3 | ✅ Implementado localmente | apps/web/app/(app)/vendas; /v1/orders | E2E |  |  |
 | R24-02 | Detalhe da venda: linha do tempo, recebimentos, eventos, itens, pagamentos, reembolsos, evidência de atribuição, destinos e conciliação; co… | E2/E3 | ✅ Implementado localmente | apps/web/app/(app)/vendas/[id]; /v1/orders/:id | E2E |  |  |
 | R24-03 | Produtos: grupos, ofertas, planos, preço de referência, custos com vigência, mapeamento de IDs externos por provedor; mesmo nome em checkou… | E2/E3 | 🟡 Parcial | Produto por (conta, ID externo), sem unificar por nome | webhook-pipeline.test.ts |  | Grupos/ofertas/planos e custos por produto pendentes |
-| R24-04 | Clientes: histórico, primeira compra, recorrência, receita/contribuição, consentimentos, vínculos; deduplicação explicável e reversível; se… | E2/E3 | ⏳ Planejado | Visão de clientes |  |  |  |
+| R24-04 | Clientes: histórico, primeira compra, recorrência, receita/contribuição, consentimentos, vínculos; deduplicação explicável e reversível; se… | E2/E3 | 🟡 Parcial | Clientes por e-mail normalizado (hash) dentro da organização: histórico, primeira/última compra, recorrência, aprovado/líquido por moeda, consentimentos observados, exclusões reversíveis auditadas; PII mascarada sem pii.read | attribution-customers.test.ts; E2E |  | Contribuição por cliente e deduplicação por outros identificadores pendentes |
 | R24-05 | Vendas manuais/offline por API ou formulário com permissão, origem, comprovante e auditoria; confirmação manual ≠ checkout; correções por a… | E2/E3 | ✅ Implementado localmente | POST /v1/orders/manual e POST /public/v1/sales (serviço createManualSale; auditado com actor_type user/api_key; provedor "manual") | webhook-pipeline.test.ts; public-api.test.ts |  |  |
 | R24-06 | E-commerce: pagamento, cancelamento, devolução, frete e atendimento separados; respeitar mecanismos de extensão de cada loja. | E2/E3 | ⏳ Planejado | E-commerce (frete/devolução) |  |  |  |
 

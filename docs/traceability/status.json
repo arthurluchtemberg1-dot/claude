@@ -1578,20 +1578,20 @@
       "stage": "E2"
     },
     {
-      "status": "partial",
-      "impl": "7 modelos; políticas versionadas; comparação entre políticas ativas",
-      "tests": "attribution.test.ts",
+      "status": "done",
+      "impl": "Política principal (default) versionada + políticas de comparação (até 6 ativas); API /v1/attribution/* e tela Atribuição; comparação por categoria e receita creditada por rede; seletor de política no painel",
+      "tests": "attribution-customers.test.ts; attribution.test.ts; E2E",
       "dep": "",
-      "note": "7 modelos e versões no banco; tela/API de gestão de políticas pendente",
+      "note": "",
       "id": "R16-01",
       "stage": "E2"
     },
     {
-      "status": "partial",
-      "impl": "packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts",
-      "tests": "attribution.test.ts, tracking-attribution.test.ts",
+      "status": "done",
+      "impl": "Janelas 1/7/14/30 dias por política, editáveis por nova versão (histórico preservado)",
+      "tests": "attribution-customers.test.ts",
       "dep": "",
-      "note": "window_days 1–90 por política; edição pela interface pendente",
+      "note": "",
       "id": "R16-02",
       "stage": "E2"
     },
@@ -1633,8 +1633,8 @@
     },
     {
       "status": "done",
-      "impl": "packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts",
-      "tests": "attribution.test.ts, tracking-attribution.test.ts",
+      "impl": "packages/domain/src/attribution/*; apps/worker/src/handlers/attribution.ts; recálculo explícito por período (POST /v1/attribution/recompute, até 5000 vendas) sem Purchase",
+      "tests": "attribution.test.ts, tracking-attribution.test.ts; attribution-customers.test.ts",
       "dep": "",
       "note": "",
       "id": "R16-07",
@@ -2424,11 +2424,11 @@
       "stage": "E2/E3"
     },
     {
-      "status": "planned",
-      "impl": "Visão de clientes",
-      "tests": "",
+      "status": "partial",
+      "impl": "Clientes por e-mail normalizado (hash) dentro da organização: histórico, primeira/última compra, recorrência, aprovado/líquido por moeda, consentimentos observados, exclusões reversíveis auditadas; PII mascarada sem pii.read",
+      "tests": "attribution-customers.test.ts; E2E",
       "dep": "",
-      "note": "",
+      "note": "Contribuição por cliente e deduplicação por outros identificadores pendentes",
       "id": "R24-04",
       "stage": "E2/E3"
     },

@@ -16,6 +16,7 @@ export const PERMISSIONS = [
   "api.manage",
   "sales.write",
   "org.manage",
+  "attribution.manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

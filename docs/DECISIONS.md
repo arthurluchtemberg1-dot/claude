@@ -77,3 +77,9 @@ Formato: decisão · contexto · alternativas rejeitadas · consequências. Reve
 
 ## D-022 — Resposta somente após o COMMIT
 - Descoberto em teste: rotas que chamavam `reply.send()` dentro do callback da transação respondiam antes do COMMIT (cliente podia usar uma chave/conta ainda invisível, ou receber sucesso de algo revertido). Regra: dentro da transação só `reply.status()`; o corpo é retornado e enviado depois. Teste de regressão determinístico com COMMIT atrasado por gatilho adiado.
+
+## D-023 — Política principal fixa (`default`) e políticas de comparação
+- Vendas, exportações, webhooks e a lista de pedidos usam a política `default`; alterá-la cria nova versão (a anterior e seus resultados ficam no histórico). Outras políticas (até 6 ativas, pois todas são calculadas a cada venda) servem para comparação e podem ser escolhidas no painel. Vendas anteriores só recebem resultado numa política nova após recálculo explícito do período.
+
+## D-024 — Clientes agrupados por e-mail normalizado, só para leitura
+- Agrupamento pelo hash do e-mail informado no checkout, dentro da organização, exibindo o critério e permitindo separar pedidos (auditado, reversível). Não é usado para atribuição, vínculo de upsell (R10-07) nem compartilhado entre organizações.

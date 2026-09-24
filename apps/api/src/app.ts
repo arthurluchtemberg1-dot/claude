@@ -22,6 +22,8 @@ import { costRoutes } from "./routes/costs";
 import { utmRoutes } from "./routes/utm";
 import { healthRoutes } from "./routes/health";
 import { apiManagementRoutes } from "./routes/api-management";
+import { attributionRoutes } from "./routes/attribution";
+import { customerRoutes } from "./routes/customers";
 import { publicApi } from "./public/plugin";
 
 /** Rotas públicas sem cookie (CORS aberto, sem credenciais): coleta do SDK e webhooks. */
@@ -111,6 +113,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(costRoutes(deps), { prefix: "/v1" });
   await app.register(utmRoutes(), { prefix: "/v1" });
   await app.register(apiManagementRoutes(deps), { prefix: "/v1" });
+  await app.register(attributionRoutes(deps), { prefix: "/v1" });
+  await app.register(customerRoutes(deps), { prefix: "/v1" });
   await app.register(publicApi(deps), { prefix: "/public/v1" });
   await app.register(ingestRoutes(deps));
   return app;
