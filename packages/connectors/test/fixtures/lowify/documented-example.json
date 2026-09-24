@@ -1,0 +1,27 @@
+{
+  "event": "sale.paid",
+  "order_id": "ord_xxxxxxxxx",
+  "sale_amount": 199.90,
+  "status": "paid",
+  "timestamp": "2026-03-10 14:30:00",
+  "product": {
+    "id": 321,
+    "name": "Produto X",
+    "price": 199.90,
+    "type": "main"
+  },
+  "customer": {
+    "name": "Cliente Exemplo",
+    "email": "cliente@dominio.com",
+    "phone": "11999999999"
+  },
+  "tracking": {
+    "click_id": 10,
+    "campaign_id": 20,
+    "utm_source": "facebook",
+    "utm_medium": "cpc",
+    "utm_campaign": "campanha",
+    "utm_content": "criativo-a",
+    "utm_term": "keyword"
+  }
+}
