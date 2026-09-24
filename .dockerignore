@@ -1,0 +1,15 @@
+**/node_modules
+**/.next
+**/dist
+**/*.tsbuildinfo
+**/test-results
+**/playwright-report
+**/coverage
+.git
+.env
+.env.*
+!.env.example
+apps/web/.e2e-outbox
+backups
+*.dump
+*.dump.manifest.json

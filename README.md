@@ -76,10 +76,10 @@ pnpm docs:metrics   # regenera docs/METRICS_DICTIONARY.md
 
 ## Produção (resumo)
 
-API e worker são processos persistentes (não serverless) com `/health` e `/ready` e encerramento gracioso (`SIGTERM`). O painel é gerado com `output: "standalone"` e encaminha `/api/*` e `/sdk/*` para a API (`API_INTERNAL_URL`). Defina `NODE_ENV=production`, `APP_ENV=production`, `SESSION_COOKIE_SECURE=true`, provedor de e-mail real e segredos por ambiente. Dockerfiles e checklist de implantação ainda estão pendentes (ver STATUS). Envio real a destinos exige `ALLOW_EXTERNAL_DELIVERY=true` **e** destino ativado com emissor responsável.
+API e worker são processos persistentes (não serverless) com `/health` e `/ready` e encerramento gracioso (`SIGTERM`). Imagens: `Dockerfile` (alvos `api`, `worker`, `web`); pilha de referência em `deploy/docker-compose.yml`, verificável com `node deploy/compose-smoke.mjs`. Checklist, backup/restauração e reversão em [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). Envio real a destinos exige `ALLOW_EXTERNAL_DELIVERY=true` **e** destino ativado com emissor responsável.
 
 ## Documentação
 
 - [Arquitetura](docs/ARCHITECTURE.md) · [Decisões](docs/DECISIONS.md) · [Dicionário de métricas](docs/METRICS_DICTIONARY.md)
 - [Matriz de rastreabilidade](docs/REQUIREMENTS_TRACEABILITY.md) · [Integrações](docs/INTEGRATIONS_MATRIX.md) · [Dependências externas](docs/EXTERNAL_DEPENDENCIES.md)
-- [Webhook canônico assinado](docs/integrations/CANONICAL_WEBHOOK.md) · [SDK](docs/SDK.md) · [API pública e webhooks de saída](docs/API.md) · [Runbooks](docs/RUNBOOKS.md)
+- [Webhook canônico assinado](docs/integrations/CANONICAL_WEBHOOK.md) · [SDK](docs/SDK.md) · [API pública e webhooks de saída](docs/API.md) · [Implantação](docs/DEPLOYMENT.md) · [Runbooks](docs/RUNBOOKS.md)

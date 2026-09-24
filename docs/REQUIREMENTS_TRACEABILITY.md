@@ -8,18 +8,18 @@ Atualizado em: 2026-09-24. Estados de requisito conforme R11-03/R46-01: "Impleme
 
 | Estado | Requisitos |
 | --- | --- |
-| ✅ Implementado localmente | 217 |
+| ✅ Implementado localmente | 218 |
 | 🟡 Parcial | 78 |
 | ⛔ Bloqueado externamente | 12 |
-| ⏳ Planejado | 116 |
+| ⏳ Planejado | 115 |
 | 📄 Método/documento | 13 |
 | **Total** | **436** |
 
 | Cenários de teste (seção 43) | Quantidade |
 | --- | --- |
-| ✅ Automatizado e executado | 55 |
+| ✅ Automatizado e executado | 56 |
 | 🟡 Parcial | 2 |
-| ⏳ Planejado | 12 |
+| ⏳ Planejado | 11 |
 | ⛔ Bloqueado | 1 |
 
 ## Cenários obrigatórios T01–T70
@@ -94,7 +94,7 @@ Atualizado em: 2026-09-24. Estados de requisito conforme R11-03/R46-01: "Impleme
 | T66 | ✅ Automatizado e executado | webhook-pipeline.test.ts |
 | T67 | ✅ Automatizado e executado | outbound.test.ts (IPs internos, IPv6/mapeados, DNS na conexão, redirect para interno/metadata/rebind); webhooks-out.test.ts (cadastro bloqueado) |
 | T68 | ✅ Automatizado e executado | canonical-meta.test.ts; deliveries-relay.test.ts |
-| T69 | ⏳ Planejado | Backup/restore (E9) |
+| T69 | ✅ Automatizado e executado | backup-restore.test.ts (restauração verificada em banco novo; sem segredos/chaves no dump; login, pedidos e webhook funcionando no banco restaurado) |
 | T70 | ✅ Automatizado e executado | apps/web/e2e/journey.spec.ts (payload Lowify documentado, local) |
 
 ## Requisitos
@@ -715,9 +715,9 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R41-01 | `.env.example` com descrição, escopo público/servidor, formato, obrigatoriedade e origem; sem valores reais. | E9 | ✅ Implementado localmente | .env.example com escopo, formato, obrigatoriedade e origem | — |  |  |
 | R41-02 | Categorias: URLs, Supabase, PostgreSQL por papel, Redis/worker, chaves de criptografia/assinatura, OAuth por provedor, cobrança, SMTP/push/… | E9 | ✅ Implementado localmente | .env.example (todas as categorias) | — |  |  |
 | R41-03 | Credenciais de clientes no cofre do servidor por conexão; nunca em variáveis globais ou Git. | E9 | ✅ Implementado localmente | private.credentials por conexão | rls.itest.ts |  |  |
-| R41-04 | Desenvolvimento local reproduzível: banco local, Redis, lockfile, migrações, seed sintético marcado; documentar qual banco cada comando usa. | E9 | ✅ Implementado localmente | scripts/db-setup.mjs, pnpm db:migrate, bancos por comando documentados | — |  | Seed de demonstração pendente |
-| R41-05 | Comandos reais: dev, build, lint, typecheck, testes, migrações, seed, worker, simulação de webhook, backfill, diagnóstico; README sem coman… | E9 | 🟡 Parcial | Comandos reais no package.json raiz | — |  | simulate:webhook, diag, backfill e seed:demo ainda sem implementação (não listados no README) |
-| R41-06 | Implantação: web compatível; API/worker em processos persistentes; Dockerfiles, health checks, readiness, encerramento gracioso, migrações … | E9 | 🟡 Parcial | Health/readiness e encerramento gracioso em API e worker; build standalone do painel | — | DEP-HOSTING | Dockerfiles pendentes |
+| R41-04 | Desenvolvimento local reproduzível: banco local, Redis, lockfile, migrações, seed sintético marcado; documentar qual banco cada comando usa. | E9 | ✅ Implementado localmente | scripts/db-setup.mjs, pnpm db:migrate, bancos por comando documentados | — |  | Seed de demonstração: pnpm db:seed:demo (dados sintéticos isolados) |
+| R41-05 | Comandos reais: dev, build, lint, typecheck, testes, migrações, seed, worker, simulação de webhook, backfill, diagnóstico; README sem coman… | E9 | 🟡 Parcial | Comandos reais no package.json raiz: dev, build, lint, typecheck, test(s), db:setup/migrate/status/seed:demo, worker, webhook:simulate, diag, traceability, docs:metrics; scripts/backup.mjs e restore.mjs | — |  | Backfill ainda inexistente (depende de conectores com consulta histórica) |
+| R41-06 | Implantação: web compatível; API/worker em processos persistentes; Dockerfiles, health checks, readiness, encerramento gracioso, migrações … | E9 | ✅ Implementado localmente | Dockerfile multi-alvo (api/worker/web; usuário não root; HEALTHCHECK), deploy/docker-compose.yml (PostgreSQL 16, Redis AOF, migrate + provision-roles, API, worker, painel), readiness, SIGTERM gracioso, migrações por checksum, variáveis por ambiente, TLS/domínio via proxy reverso e reversão documentados (docs/DEPLOYMENT.md) | deploy/compose-smoke.mjs executado: imagens construídas, cadastro → webhook → worker → pedido aprovado em contêineres | DEP-HOSTING | Hospedagem real depende de DEP-HOSTING |
 | R41-07 | Sem provisionamento pago implícito; produção não declarada pronta por build. | E9 | ✅ Implementado localmente | Nada provisionado; produção não declarada | — |  |  |
 
 ### 42. Operação, capacidade e custo
@@ -728,7 +728,7 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R42-02 | IDs de correlação sem dados pessoais; alertas com alcance e ação recomendada. | E9 | ✅ Implementado localmente | request_id em todas as respostas/logs; sem PII | — |  |  |
 | R42-03 | Resiliência: outbox recupera após falha do Redis; worker reinicia sem duplicar; isolamento entre provedores; prioridades/cotas por organiza… | E9 | ✅ Implementado localmente | Outbox + relay + retomada; lock por pedido; circuit breaker; encerramento gracioso | deliveries-relay.test.ts, webhook-pipeline.test.ts |  |  |
 | R42-04 | Índices, agregações incrementais, análise de consultas; sem warehouse/Kafka/K8s prematuros. | E9 | ✅ Implementado localmente | Índices por org/período/estado; sem Kafka/warehouse | — |  |  |
-| R42-05 | Backups, restauração e DR com procedimento testado; RPO/RTO/SLA como metas até evidência. | E9 | ⏳ Planejado | Backup/restore testado (T69) |  |  |  |
+| R42-05 | Backups, restauração e DR com procedimento testado; RPO/RTO/SLA como metas até evidência. | E9 | 🟡 Parcial | scripts/backup.mjs (pg_dump no mesmo snapshot do manifesto) e scripts/restore.mjs (sha256, transação única, comparação de contagens/razão/credenciais cifradas); procedimento em docs/DEPLOYMENT.md | backup-restore.test.ts (T69) |  | RPO/RTO e DR entre regiões dependem da hospedagem (DEP-HOSTING); agendamento do backup é do operador |
 | R42-06 | Estimador de custos operacionais com premissas. | E9 | ⏳ Planejado | Estimador de custos |  |  |  |
 | R42-07 | Teste de carga reproduzível com cenário, dataset, hardware, concorrência, latências, erros e custo. | E9 | ⏳ Planejado | Teste de carga reproduzível |  |  |  |
 

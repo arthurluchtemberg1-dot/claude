@@ -39,7 +39,10 @@ Procedimentos para incidentes comuns. Comandos assumem acesso ao ambiente e ao `
 - Pixels e conversões → Entregas: `rejected` (erro permanente, ver código do provedor), `retry_scheduled` (429/5xx), `unknown_outcome` (timeout; repetição só com o mesmo `event_id`), `not_eligible` (motivo explícito). Circuit breaker aberto reagenda por 5 min. Reenvio manual mantém o `event_id`.
 
 ## Restauração de backup
-- Ainda não automatizado nem testado (T69, R42-05). Procedimento previsto: `pg_dump -Fc` diário do banco, restauração em banco novo, `pnpm db:status`, validação de contagens e somas do razão por organização, e rotação das credenciais se o backup tiver sido exposto (as credenciais estão cifradas com chaves fora do banco).
+1. Crie um banco NOVO (nunca restaure sobre o banco em uso) e provisione os papéis: `DATABASE_URL_ADMIN=… DB_APP_PASSWORD=… DB_SYSTEM_PASSWORD=… node packages/db/dist/cli.js provision-roles`.
+2. `node scripts/restore.mjs --url <admin do banco novo> --in <arquivo.dump>`: confere sha256, restaura em transação única e compara contagens, somas do razão, migrações e digest das credenciais cifradas; divergência = erro.
+3. Aponte API e worker para o banco restaurado (mesmas `CREDENTIALS_KEYS` e `TOKEN_HMAC_SECRET`, que ficam fora do backup) e confira `/ready`, `pnpm diag` e um webhook de teste.
+4. Se o arquivo de backup foi exposto, rotacione credenciais de provedores e segredos de webhooks (seção acima). Procedimento automatizado em `backup-restore.test.ts` (T69).
 
 ## Chave de API vazada ou uso suspeito
 1. API e webhooks → revogar a chave (efeito imediato, `401 api_key_revoked`); criar outra com escopos mínimos e projetos restritos.

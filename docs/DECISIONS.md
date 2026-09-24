@@ -83,3 +83,10 @@ Formato: decisão · contexto · alternativas rejeitadas · consequências. Reve
 
 ## D-024 — Clientes agrupados por e-mail normalizado, só para leitura
 - Agrupamento pelo hash do e-mail informado no checkout, dentro da organização, exibindo o critério e permitindo separar pedidos (auditado, reversível). Não é usado para atribuição, vínculo de upsell (R10-07) nem compartilhado entre organizações.
+
+## D-025 — Imagens sem pacotes do sistema; CA de build como segredo
+- As imagens partem de `node:22.22.2-bookworm-slim` sem `apt` (o espelho Debian é bloqueado neste ambiente e não é necessário): API e worker tratam `SIGTERM` e não criam processos filhos; `init: true` no compose cobre sinais/zumbis. Um CA adicional para proxies com inspeção TLS entra só como segredo de build (`--secret id=extra_ca`), nunca na imagem.
+- O painel fixa `API_INTERNAL_URL` no build (rewrites do Next); o compose passa `http://api:4000`.
+
+## D-026 — "Produção" do e-mail é o ambiente de implantação (APP_ENV)
+- `NODE_ENV=production` é modo de build/execução; `APP_ENV` identifica o ambiente. Transportes `log`/`file` são recusados só com `APP_ENV=production`, permitindo homologação em contêiner com imagens de produção. SMTP com TLS obrigatório em produção (smtps:// ou STARTTLS exigido).

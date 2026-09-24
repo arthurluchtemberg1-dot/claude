@@ -3697,25 +3697,25 @@
       "impl": "scripts/db-setup.mjs, pnpm db:migrate, bancos por comando documentados",
       "tests": "—",
       "dep": "",
-      "note": "Seed de demonstração pendente",
+      "note": "Seed de demonstração: pnpm db:seed:demo (dados sintéticos isolados)",
       "id": "R41-04",
       "stage": "E9"
     },
     {
       "status": "partial",
-      "impl": "Comandos reais no package.json raiz",
+      "impl": "Comandos reais no package.json raiz: dev, build, lint, typecheck, test(s), db:setup/migrate/status/seed:demo, worker, webhook:simulate, diag, traceability, docs:metrics; scripts/backup.mjs e restore.mjs",
       "tests": "—",
       "dep": "",
-      "note": "simulate:webhook, diag, backfill e seed:demo ainda sem implementação (não listados no README)",
+      "note": "Backfill ainda inexistente (depende de conectores com consulta histórica)",
       "id": "R41-05",
       "stage": "E9"
     },
     {
-      "status": "partial",
-      "impl": "Health/readiness e encerramento gracioso em API e worker; build standalone do painel",
-      "tests": "—",
+      "status": "done",
+      "impl": "Dockerfile multi-alvo (api/worker/web; usuário não root; HEALTHCHECK), deploy/docker-compose.yml (PostgreSQL 16, Redis AOF, migrate + provision-roles, API, worker, painel), readiness, SIGTERM gracioso, migrações por checksum, variáveis por ambiente, TLS/domínio via proxy reverso e reversão documentados (docs/DEPLOYMENT.md)",
+      "tests": "deploy/compose-smoke.mjs executado: imagens construídas, cadastro → webhook → worker → pedido aprovado em contêineres",
       "dep": "DEP-HOSTING",
-      "note": "Dockerfiles pendentes",
+      "note": "Hospedagem real depende de DEP-HOSTING",
       "id": "R41-06",
       "stage": "E9"
     },
@@ -3765,11 +3765,11 @@
       "stage": "E9"
     },
     {
-      "status": "planned",
-      "impl": "Backup/restore testado (T69)",
-      "tests": "",
+      "status": "partial",
+      "impl": "scripts/backup.mjs (pg_dump no mesmo snapshot do manifesto) e scripts/restore.mjs (sha256, transação única, comparação de contagens/razão/credenciais cifradas); procedimento em docs/DEPLOYMENT.md",
+      "tests": "backup-restore.test.ts (T69)",
       "dep": "",
-      "note": "",
+      "note": "RPO/RTO e DR entre regiões dependem da hospedagem (DEP-HOSTING); agendamento do backup é do operador",
       "id": "R42-05",
       "stage": "E9"
     },
@@ -4270,8 +4270,8 @@
     },
     {
       "id": "T69",
-      "status": "planned",
-      "evidence": "Backup/restore (E9)"
+      "status": "done",
+      "evidence": "backup-restore.test.ts (restauração verificada em banco novo; sem segredos/chaves no dump; login, pedidos e webhook funcionando no banco restaurado)"
     },
     {
       "id": "T70",

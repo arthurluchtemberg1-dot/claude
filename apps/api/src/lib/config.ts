@@ -32,6 +32,7 @@ const schema = z.object({
   EMAIL_TRANSPORT: z.enum(["log", "memory", "file", "smtp"]).default("log"),
   EMAIL_OUTBOX_DIR: z.string().optional(),
   EMAIL_FROM: z.string().default("Tracker <no-reply@example.com>"),
+  SMTP_URL: z.string().optional(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "silent"]).default("info"),
   META_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v24.0"),
   ALLOW_EXTERNAL_DELIVERY: z
@@ -75,6 +76,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (!credentialKeys.has(c.CREDENTIALS_KEY_CURRENT)) throw new Error("CREDENTIALS_KEY_CURRENT não corresponde a nenhuma chave");
   if (c.NODE_ENV === "production" && !c.SESSION_COOKIE_SECURE) throw new Error("Em produção SESSION_COOKIE_SECURE deve ser true");
+  if (c.EMAIL_TRANSPORT === "smtp" && !c.SMTP_URL) throw new Error("EMAIL_TRANSPORT=smtp exige SMTP_URL");
   return {
     ...c,
     credentialKeys,

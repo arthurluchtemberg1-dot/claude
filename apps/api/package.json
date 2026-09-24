@@ -24,18 +24,22 @@
     "@tracker/db": "workspace:*",
     "@tracker/domain": "workspace:*",
     "fastify": "5.12.5",
+    "ioredis": "5.11.1",
+    "nodemailer": "10.0.10",
     "pg": "8.23.0",
     "pino": "10.3.1",
-    "zod": "4.6.5",
-    "ioredis": "5.11.1"
+    "zod": "4.6.5"
   },
   "devDependencies": {
-    "@types/node": "22.20.4",
-    "@types/pg": "8.23.1",
-    "esbuild": "0.28.2",
-    "tsx": "4.23.15",
-    "typescript": "5.9.3",
     "@tracker/worker": "workspace:*",
-    "bullmq": "6.3.8"
+    "@types/node": "22.20.4",
+    "@types/nodemailer": "8.0.2",
+    "@types/pg": "8.23.1",
+    "@types/smtp-server": "3.5.13",
+    "bullmq": "6.3.8",
+    "esbuild": "0.28.2",
+    "smtp-server": "3.19.13",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
   }
 }
