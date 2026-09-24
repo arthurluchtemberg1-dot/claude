@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.next/
+out/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+.turbo/
+playwright-report/
+test-results/
+.DS_Store
+*.tsbuildinfo
+/tmp/
+packages/tracker/dist/
+apps/web/public/sdk/

@@ -1,0 +1,39 @@
+{
+  "name": "tracker-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @tracker/api --filter @tracker/worker --filter @tracker/web dev",
+    "dev:api": "pnpm --filter @tracker/api dev",
+    "dev:worker": "pnpm --filter @tracker/worker dev",
+    "dev:web": "pnpm --filter @tracker/web dev",
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:e2e": "pnpm --filter @tracker/web test:e2e",
+    "db:setup": "node --env-file-if-exists=.env scripts/db-setup.mjs",
+    "db:migrate": "pnpm --filter @tracker/db migrate",
+    "db:status": "pnpm --filter @tracker/db status",
+    "db:seed:demo": "pnpm --filter @tracker/db seed:demo",
+    "worker": "pnpm --filter @tracker/worker start",
+    "webhook:simulate": "pnpm --filter @tracker/api simulate:webhook",
+    "diag": "pnpm --filter @tracker/api diag",
+    "traceability": "node scripts/check-traceability.mjs",
+    "sdk:build": "pnpm --filter @tracker/tracker build"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.4",
+    "eslint": "10.11.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.1",
+    "vitest": "5.0.1"
+  }
+}
