@@ -11,7 +11,7 @@ export default async function setup() {
   await client.connect();
   try {
     // Estado limpo a cada execução da suíte (somente no banco de teste).
-    await client.query("truncate public.organizations, iam.users, public.feature_flags cascade");
+    await client.query("truncate public.organizations, iam.users, iam.auth_attempts, public.feature_flags cascade");
   } finally {
     await client.end();
   }
