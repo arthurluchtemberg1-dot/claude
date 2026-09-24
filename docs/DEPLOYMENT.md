@@ -33,6 +33,12 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env ps
 | Monitorar `/ready` (API e worker), fila (`pnpm diag` ou Diagnóstico) e erros 5xx | alertas no seu provedor de observabilidade (DEP-OBSERVABILITY) |
 | Documentos legais e política de privacidade publicados | DEP-LEGAL |
 
+## Capacidade e testes de carga
+
+- `node scripts/load-test.mjs --orders 2000 --concurrency 32` sobe a pilha de referência e mede aceite de webhooks, processamento ponta a ponta, idempotência sob duplicatas, coleta do SDK e leitura do painel; relatórios em `docs/load-tests/`.
+- `node scripts/cost-estimate.mjs --report docs/load-tests/<relatório>.json --orders-month … --peak-orders-minute …` estima réplicas e armazenamento a partir das medições; valores em dinheiro só com os preços do seu provedor (`--price-vcpu-hour`, `--price-gb-month`).
+- Limites de ingestão por instância: `WEBHOOK_RATE_LIMIT_PER_MINUTE` (padrão 600 por endpoint) e `COLLECT_RATE_LIMIT_PER_MINUTE` (padrão 300 por IP). Para lançamentos com picos maiores, aumente conforme a capacidade medida; excedentes recebem `429` e dependem do reenvio do provedor.
+
 ## Escala
 
 - API: sem estado; várias réplicas atrás do balanceador (limites da API pública são compartilhados via banco).

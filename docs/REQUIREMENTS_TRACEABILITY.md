@@ -8,10 +8,10 @@ Atualizado em: 2026-09-24. Estados de requisito conforme R11-03/R46-01: "Impleme
 
 | Estado | Requisitos |
 | --- | --- |
-| ✅ Implementado localmente | 221 |
+| ✅ Implementado localmente | 223 |
 | 🟡 Parcial | 75 |
 | ⛔ Bloqueado externamente | 12 |
-| ⏳ Planejado | 115 |
+| ⏳ Planejado | 113 |
 | 📄 Método/documento | 13 |
 | **Total** | **436** |
 
@@ -727,10 +727,10 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R42-01 | Instrumentar webhooks, eventos, rejeições, atraso de fila, processamento, tentativas externas, falhas por provedor, sincronia de gastos, er… | E9 | 🟡 Parcial | Logs estruturados por requisição; contadores no diagnóstico | — |  |  |
 | R42-02 | IDs de correlação sem dados pessoais; alertas com alcance e ação recomendada. | E9 | ✅ Implementado localmente | request_id em todas as respostas/logs; sem PII | — |  |  |
 | R42-03 | Resiliência: outbox recupera após falha do Redis; worker reinicia sem duplicar; isolamento entre provedores; prioridades/cotas por organiza… | E9 | ✅ Implementado localmente | Outbox + relay + retomada; lock por pedido; circuit breaker; encerramento gracioso | deliveries-relay.test.ts, webhook-pipeline.test.ts |  |  |
-| R42-04 | Índices, agregações incrementais, análise de consultas; sem warehouse/Kafka/K8s prematuros. | E9 | ✅ Implementado localmente | Índices por org/período/estado; sem Kafka/warehouse | — |  |  |
+| R42-04 | Índices, agregações incrementais, análise de consultas; sem warehouse/Kafka/K8s prematuros. | E9 | ✅ Implementado localmente | Índices por org/período/estado; sem Kafka/warehouse; leituras de métricas sem subconsultas por pedido; autovacuum ajustado nas tabelas quentes (D-028) | — |  |  |
 | R42-05 | Backups, restauração e DR com procedimento testado; RPO/RTO/SLA como metas até evidência. | E9 | 🟡 Parcial | scripts/backup.mjs (pg_dump no mesmo snapshot do manifesto) e scripts/restore.mjs (sha256, transação única, comparação de contagens/razão/credenciais cifradas); procedimento em docs/DEPLOYMENT.md | backup-restore.test.ts (T69) |  | RPO/RTO e DR entre regiões dependem da hospedagem (DEP-HOSTING); agendamento do backup é do operador |
-| R42-06 | Estimador de custos operacionais com premissas. | E9 | ⏳ Planejado | Estimador de custos |  |  |  |
-| R42-07 | Teste de carga reproduzível com cenário, dataset, hardware, concorrência, latências, erros e custo. | E9 | ⏳ Planejado | Teste de carga reproduzível |  |  |  |
+| R42-06 | Estimador de custos operacionais com premissas. | E9 | ✅ Implementado localmente | scripts/cost-estimate.mjs: réplicas e armazenamento a partir do relatório medido + premissas explícitas; valores em dinheiro só com preços informados pelo operador | executado sobre docs/load-tests/2026-09-24-carga-2000.json |  |  |
+| R42-07 | Teste de carga reproduzível com cenário, dataset, hardware, concorrência, latências, erros e custo. | E9 | ✅ Implementado localmente | scripts/load-test.mjs sobre a pilha de contêineres: cenário, dataset sintético, hardware, versões, concorrência, percentis, erros, pipeline ponta a ponta, idempotência sob duplicatas e armazenamento medido; relatórios em docs/load-tests (antes/depois) | docs/load-tests/2026-09-24-carga-2000*.md; perf-metrics.test.ts (PERF=1) |  | Gerador e pilha na mesma máquina; ordem de grandeza, não SLA |
 
 ### 43. Matriz de testes
 

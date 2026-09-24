@@ -213,13 +213,21 @@ export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): 
            select ord.unit,
                   sum(e.amount_minor) filter (where e.entry_type = 'approval' and (${cohort ? "true" : "e.revenue_kind <> 'renewal'"})) as approved,
                   sum(e.amount_minor) filter (where e.entry_type in ('approval','refund','chargeback','chargeback_reversal') and (${cohort ? "true" : "e.revenue_kind <> 'renewal'"})) as net
-             from ord join ent e on e.order_id = ord.order_id where e.currency = ${cur} group by ord.unit)
-         select u.unit, p.approved, p.net, a.category, a.model, a.policy_version, a.credits, a.window_days,
-                (select coalesce(json_agg(t.id), '[]') from public.touchpoints t
-                  where t.organization_id = $1 and t.is_paid and t.id::text in (select x->>'touchpoint_id' from jsonb_array_elements(a.credits) x)) as paid_touch_ids
-           from unit_first u join per_unit p on p.unit = u.unit
-           left join public.order_attributions a on a.order_id = u.first_order and a.is_current and a.policy_key = $8 and a.organization_id = $1
-          where p.approved > 0`,
+             from ord join ent e on e.order_id = ord.order_id where e.currency = ${cur} group by ord.unit),
+         attr as materialized (
+           select u.unit, u.first_order, p.approved, p.net, a.category, a.model, a.policy_version, a.window_days, a.credits
+             from unit_first u join per_unit p on p.unit = u.unit
+             left join public.order_attributions a on a.order_id = u.first_order and a.is_current and a.policy_key = $8 and a.organization_id = $1
+            where p.approved > 0),
+         -- Créditos expandidos uma vez e unidos a touchpoints em conjunto (a expansão correlacionada fazia o planejador
+         -- varrer touchpoints por pedido: ~0,5 ms × pedidos — achado do teste de carga).
+         cred as materialized (
+           select attr.unit, x->>'weight' as weight, (x->>'touchpoint_id')::uuid as touchpoint_id
+             from attr cross join lateral jsonb_array_elements(attr.credits) x
+            where attr.category is not null and attr.category <> 'unattributed')
+         select attr.unit, attr.approved, attr.net, attr.category, attr.model, attr.policy_version, attr.window_days, c.weight, coalesce(t.is_paid, false) as paid
+           from attr left join cred c on c.unit = attr.unit
+           left join public.touchpoints t on t.organization_id = $1 and t.id = c.touchpoint_id`,
         [...p, scope.policyKey],
       )
     ).rows;
@@ -231,23 +239,31 @@ export async function collectMetricsInputs(c: PoolClient, scope: MetricsScope): 
     let unattributed = 0;
     let policyLabel = scope.policyKey;
     const addR = (a: { num: bigint; den: bigint }, b: { num: bigint; den: bigint }) => ratio(a.num * b.den + b.num * a.den, a.den * b.den);
+    const units = new Map<string, { approved: bigint; net: bigint; category: string | null; credits: { weight: string; paid: boolean }[] }>();
     for (const r of attrRows) {
       if (r.model) policyLabel = `${r.model} · ${r.window_days} dias · v${r.policy_version}`;
+      let u = units.get(r.unit);
+      if (!u) {
+        u = { approved: BigInt(r.approved), net: BigInt(r.net), category: r.category, credits: [] };
+        units.set(r.unit, u);
+      }
+      if (r.weight) u.credits.push({ weight: r.weight, paid: r.paid });
+    }
+    for (const r of units.values()) {
       if (!r.category || r.category === "unattributed") {
         unattributed++;
         continue;
       }
-      const paidIds = new Set<string>(r.paid_touch_ids ?? []);
       let w = ratio(0n, 1n);
-      for (const cr of (r.credits ?? []) as { touchpoint_id: string; weight: string }[]) {
-        if (paidIds.has(cr.touchpoint_id)) w = addR(w, parseFrac(cr.weight));
+      for (const cr of r.credits) {
+        if (cr.paid) w = addR(w, parseFrac(cr.weight));
       }
       if (w.num === 0n) continue;
       if (w.num !== w.den) fractional = true;
-      attributedGross += (BigInt(r.approved) * w.num) / w.den;
-      attributedNet += (BigInt(r.net) * w.num) / w.den;
+      attributedGross += (r.approved * w.num) / w.den;
+      attributedNet += (r.net * w.num) / w.den;
       approvedCredit = addR(approvedCredit, w);
-      if (BigInt(r.net) > 0n) retainedCredit = addR(retainedCredit, w);
+      if (r.net > 0n) retainedCredit = addR(retainedCredit, w);
     }
 
     // Mídia: um único nível por conta e dia e uma única fonte por dia/entidade (T45, T46).

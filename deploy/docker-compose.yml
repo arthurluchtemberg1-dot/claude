@@ -25,11 +25,15 @@ x-app-env: &app-env
   OUTBOUND_BLOCKED_HOSTS: ${OUTBOUND_BLOCKED_HOSTS:-}
   API_RATE_LIMIT_PER_KEY: ${API_RATE_LIMIT_PER_KEY:-120}
   API_RATE_LIMIT_PER_ORG: ${API_RATE_LIMIT_PER_ORG:-600}
+  WEBHOOK_RATE_LIMIT_PER_MINUTE: ${WEBHOOK_RATE_LIMIT_PER_MINUTE:-600}
+  COLLECT_RATE_LIMIT_PER_MINUTE: ${COLLECT_RATE_LIMIT_PER_MINUTE:-300}
   LOG_LEVEL: ${LOG_LEVEL:-info}
 
 services:
   postgres:
     image: postgres:16.13
+    # Autovacuum mais frequente: estatísticas acompanham picos de vendas (D-028). Em banco gerenciado, ajuste o parâmetro equivalente.
+    command: ["postgres", "-c", "autovacuum_naptime=10s"]
     environment:
       POSTGRES_DB: tracker
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}

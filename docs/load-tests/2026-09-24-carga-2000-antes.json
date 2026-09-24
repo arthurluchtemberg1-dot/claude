@@ -1,0 +1,98 @@
+{
+  "run_id": "e23b64e3",
+  "date": "2026-09-24T04:50:23.923Z",
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "cores": 4,
+    "memory_gb": 17,
+    "platform": "Linux 6.18.44-fc-v37",
+    "note": "Mesma máquina executa gerador de carga e pilha (compete por CPU)"
+  },
+  "versions": {
+    "node": "v22.22.2",
+    "postgres": "16.13 (Debian 16.13-1.pgdg13+1)",
+    "docker": "Docker version 29.3.1, build c2be9cc"
+  },
+  "dataset": {
+    "orders": 2000,
+    "duplicates": 400,
+    "visits": 2000,
+    "reads": 200,
+    "customers": 700,
+    "products": 20,
+    "campaigns": 10
+  },
+  "concurrency": 32,
+  "limits": {
+    "WEBHOOK_RATE_LIMIT_PER_MINUTE": "100000",
+    "COLLECT_RATE_LIMIT_PER_MINUTE": "100000"
+  },
+  "results": {
+    "webhooks": {
+      "requests": 2000,
+      "concurrency": 32,
+      "seconds": 6.38,
+      "rps": 313.4,
+      "p50_ms": 98.3,
+      "p95_ms": 139.5,
+      "p99_ms": 163.6,
+      "max_ms": 191.8,
+      "errors": {}
+    },
+    "pipeline": {
+      "orders": 2000,
+      "accept_seconds": 6.386,
+      "end_to_end_seconds": 10.556,
+      "drain_after_accept_seconds": 4.17,
+      "orders_per_second_end_to_end": 189.5,
+      "attributions_current": 191
+    },
+    "duplicates": {
+      "requests": 400,
+      "concurrency": 32,
+      "seconds": 1.09,
+      "rps": 365.9,
+      "p50_ms": 81.5,
+      "p95_ms": 114.2,
+      "p99_ms": 129.5,
+      "max_ms": 136,
+      "errors": {},
+      "orders_and_sum_after": "2000:6900000",
+      "idempotent": true
+    },
+    "collect": {
+      "requests": 2000,
+      "concurrency": 32,
+      "seconds": 3.93,
+      "rps": 509.3,
+      "p50_ms": 55.9,
+      "p95_ms": 106.9,
+      "p99_ms": 133,
+      "max_ms": 149.6,
+      "errors": {}
+    },
+    "reads": {
+      "requests": 200,
+      "concurrency": 16,
+      "seconds": 166.1,
+      "rps": 1.2,
+      "p50_ms": 9816.1,
+      "p95_ms": 32015.4,
+      "p99_ms": 33362.3,
+      "max_ms": 33648.4,
+      "errors": {}
+    }
+  },
+  "resources": {
+    "database_bytes_total": 27828224,
+    "orders_in_database": 2001,
+    "approx_bytes_per_order": 13907,
+    "container_stats_after": [
+      "tracker-web-1 0.01% 39.55MiB / 15.72GiB",
+      "tracker-api-1 0.01% 118.1MiB / 15.72GiB",
+      "tracker-worker-1 0.18% 46.62MiB / 15.72GiB",
+      "tracker-postgres-1 0.23% 183.5MiB / 15.72GiB",
+      "tracker-redis-1 0.35% 12.73MiB / 15.72GiB"
+    ]
+  }
+}

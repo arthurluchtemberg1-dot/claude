@@ -42,6 +42,9 @@ const schema = z.object({
   // API pública: limites por minuto (chave e organização), compartilhados entre instâncias via banco.
   API_RATE_LIMIT_PER_KEY: z.coerce.number().int().positive().default(120),
   API_RATE_LIMIT_PER_ORG: z.coerce.number().int().positive().default(600),
+  // Proteção de ingestão por instância da API: webhooks por endpoint e coleta do SDK por IP (por minuto).
+  WEBHOOK_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(600),
+  COLLECT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
   MFA_REQUIRED_DEFAULT: z
     .string()
     .optional()

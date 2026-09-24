@@ -15,7 +15,7 @@ export const ingestRoutes =
 
     app.post(
       "/v1/webhooks/:token",
-      { config: { rateLimit: { max: 600, timeWindow: "1 minute", keyGenerator: (req) => `${(req.params as { token?: string }).token ?? ""}` } } },
+      { config: { rateLimit: { max: deps.config.WEBHOOK_RATE_LIMIT_PER_MINUTE, timeWindow: "1 minute", keyGenerator: (req) => `${(req.params as { token?: string }).token ?? ""}` } } },
       async (req, reply) => {
         const { token } = req.params as { token: string };
         try {
@@ -34,7 +34,7 @@ export const ingestRoutes =
       },
     );
 
-    app.post("/v1/collect", { config: { rateLimit: { max: 300, timeWindow: "1 minute" } } }, async (req, reply) => {
+    app.post("/v1/collect", { config: { rateLimit: { max: deps.config.COLLECT_RATE_LIMIT_PER_MINUTE, timeWindow: "1 minute" } } }, async (req, reply) => {
       const raw = req.body as Buffer | undefined;
       if (!raw || raw.length === 0) return reply.status(400).send({ error: "empty_body" });
       if (raw.length > 64 * 1024) return reply.status(413).send({ error: "payload_too_large" });

@@ -3757,7 +3757,7 @@
     },
     {
       "status": "done",
-      "impl": "Índices por org/período/estado; sem Kafka/warehouse",
+      "impl": "Índices por org/período/estado; sem Kafka/warehouse; leituras de métricas sem subconsultas por pedido; autovacuum ajustado nas tabelas quentes (D-028)",
       "tests": "—",
       "dep": "",
       "note": "",
@@ -3774,20 +3774,20 @@
       "stage": "E9"
     },
     {
-      "status": "planned",
-      "impl": "Estimador de custos",
-      "tests": "",
+      "status": "done",
+      "impl": "scripts/cost-estimate.mjs: réplicas e armazenamento a partir do relatório medido + premissas explícitas; valores em dinheiro só com preços informados pelo operador",
+      "tests": "executado sobre docs/load-tests/2026-09-24-carga-2000.json",
       "dep": "",
       "note": "",
       "id": "R42-06",
       "stage": "E9"
     },
     {
-      "status": "planned",
-      "impl": "Teste de carga reproduzível",
-      "tests": "",
+      "status": "done",
+      "impl": "scripts/load-test.mjs sobre a pilha de contêineres: cenário, dataset sintético, hardware, versões, concorrência, percentis, erros, pipeline ponta a ponta, idempotência sob duplicatas e armazenamento medido; relatórios em docs/load-tests (antes/depois)",
+      "tests": "docs/load-tests/2026-09-24-carga-2000*.md; perf-metrics.test.ts (PERF=1)",
       "dep": "",
-      "note": "",
+      "note": "Gerador e pilha na mesma máquina; ordem de grandeza, não SLA",
       "id": "R42-07",
       "stage": "E9"
     },

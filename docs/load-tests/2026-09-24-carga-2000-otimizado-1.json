@@ -1,0 +1,103 @@
+{
+  "run_id": "98f473f4",
+  "date": "2026-09-24T05:00:49.072Z",
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "cores": 4,
+    "memory_gb": 17,
+    "platform": "Linux 6.18.44-fc-v37",
+    "note": "Mesma máquina executa gerador de carga e pilha (compete por CPU)"
+  },
+  "versions": {
+    "node": "v22.22.2",
+    "postgres": "16.13 (Debian 16.13-1.pgdg13+1)",
+    "docker": "Docker version 29.3.1, build c2be9cc"
+  },
+  "dataset": {
+    "orders": 2000,
+    "duplicates": 400,
+    "visits": 2000,
+    "reads": 200,
+    "customers": 700,
+    "products": 20,
+    "campaigns": 10
+  },
+  "concurrency": 32,
+  "limits": {
+    "WEBHOOK_RATE_LIMIT_PER_MINUTE": "100000",
+    "COLLECT_RATE_LIMIT_PER_MINUTE": "100000"
+  },
+  "results": {
+    "webhooks": {
+      "requests": 2000,
+      "concurrency": 32,
+      "seconds": 6.32,
+      "rps": 316.2,
+      "p50_ms": 95.5,
+      "p95_ms": 144.7,
+      "p99_ms": 178.8,
+      "max_ms": 219.3,
+      "errors": {}
+    },
+    "pipeline": {
+      "orders": 2000,
+      "accept_seconds": 6.327,
+      "end_to_end_seconds": 10.382,
+      "drain_after_accept_seconds": 4.055,
+      "orders_per_second_end_to_end": 192.6,
+      "attributions_when_orders_done": 151,
+      "attribution_complete_seconds": 14.676
+    },
+    "duplicates": {
+      "requests": 400,
+      "concurrency": 32,
+      "seconds": 1.11,
+      "rps": 359.3,
+      "p50_ms": 85.9,
+      "p95_ms": 141.9,
+      "p99_ms": 157.5,
+      "max_ms": 175.5,
+      "errors": {},
+      "orders_and_sum_after": "2000:6900000",
+      "idempotent": true
+    },
+    "collect": {
+      "requests": 2000,
+      "concurrency": 32,
+      "seconds": 3.01,
+      "rps": 664.8,
+      "p50_ms": 45.6,
+      "p95_ms": 66.4,
+      "p99_ms": 86.4,
+      "max_ms": 104.2,
+      "errors": {}
+    },
+    "reads": {
+      "requests": 200,
+      "concurrency": 16,
+      "seconds": 68.1,
+      "rps": 2.9,
+      "p50_ms": 415.7,
+      "p95_ms": 22144.3,
+      "p99_ms": 22936.5,
+      "max_ms": 23164.1,
+      "errors": {}
+    }
+  },
+  "resources": {
+    "database_bytes_total": 27951104,
+    "orders_in_database": 2001,
+    "approx_bytes_per_order": 13969,
+    "tracking_bytes": 7069696,
+    "sessions_in_database": 2000,
+    "bytes_per_order": 10435,
+    "bytes_per_visit": 3535,
+    "container_stats_after": [
+      "tracker-web-1 0.01% 37.9MiB / 15.72GiB",
+      "tracker-api-1 0.00% 141.2MiB / 15.72GiB",
+      "tracker-worker-1 0.22% 51.75MiB / 15.72GiB",
+      "tracker-postgres-1 0.28% 224.2MiB / 15.72GiB",
+      "tracker-redis-1 2.85% 12.87MiB / 15.72GiB"
+    ]
+  }
+}
