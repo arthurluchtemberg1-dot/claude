@@ -9,7 +9,6 @@
   "scripts": {
     "migrate": "tsx --env-file-if-exists=../../.env src/cli.ts migrate",
     "status": "tsx --env-file-if-exists=../../.env src/cli.ts status",
-    "seed:demo": "tsx --env-file-if-exists=../../.env src/seed-demo.ts",
     "typecheck": "tsc -p tsconfig.json",
     "build": "tsc -p tsconfig.json"
   },

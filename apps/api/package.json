@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/server.ts",
     "start": "node --env-file-if-exists=../../.env dist/server.js",
-    "build": "esbuild src/server.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/server.js --packages=external --sourcemap",
+    "build": "node ../../scripts/bundle.mjs src/server.ts dist/server.js",
     "typecheck": "tsc -p tsconfig.json",
     "simulate:webhook": "tsx --env-file-if-exists=../../.env src/cli/simulate-webhook.ts",
     "diag": "tsx --env-file-if-exists=../../.env src/cli/diag.ts"
@@ -26,7 +26,8 @@
     "fastify": "5.12.5",
     "pg": "8.23.0",
     "pino": "10.3.1",
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "ioredis": "5.11.1"
   },
   "devDependencies": {
     "@types/node": "22.20.4",
@@ -35,7 +36,6 @@
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "@tracker/worker": "workspace:*",
-    "bullmq": "6.3.8",
-    "ioredis": "5.11.1"
+    "bullmq": "6.3.8"
   }
 }

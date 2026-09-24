@@ -21,19 +21,22 @@
     "db:setup": "node --env-file-if-exists=.env scripts/db-setup.mjs",
     "db:migrate": "pnpm --filter @tracker/db migrate",
     "db:status": "pnpm --filter @tracker/db status",
-    "db:seed:demo": "pnpm --filter @tracker/db seed:demo",
+    "db:seed:demo": "pnpm --filter @tracker/worker seed:demo",
     "worker": "pnpm --filter @tracker/worker start",
     "webhook:simulate": "pnpm --filter @tracker/api simulate:webhook",
     "diag": "pnpm --filter @tracker/api diag",
     "traceability": "node scripts/check-traceability.mjs",
-    "sdk:build": "pnpm --filter @tracker/tracker build"
+    "sdk:build": "pnpm --filter @tracker/tracker build",
+    "docs:metrics": "tsx scripts/gen-metrics-dictionary.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.4",
     "@types/pg": "8.23.1",
+    "esbuild": "0.28.2",
     "eslint": "10.11.0",
     "pg": "8.23.0",
+    "tsx": "4.23.15",
     "typescript": "5.9.3",
     "typescript-eslint": "8.70.1",
     "vitest": "5.0.1"
