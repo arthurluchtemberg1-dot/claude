@@ -22,6 +22,9 @@ Plataforma "Tracker" (rastreamento de vendas). Idioma do produto e dos documento
 - Toda consulta autenticada passa por `orgTx` (RLS com usuário + organização); worker usa contexto de organização por job.
 - Envio externo desligado por padrão (`ALLOW_EXTERNAL_DELIVERY=false`); testes nunca chamam provedores reais.
 - Nunca pedir segredos por mensagem; nada de segredos em commits.
+- Em rotas, nunca `reply.send()` dentro do callback de `orgTx`/`withTx`: defina só `reply.status()` e retorne o corpo (a resposta sai após o COMMIT). Teste de regressão em `public-api.test.ts`.
+- Saídas HTTP para URLs de clientes só via `safeRequest` (`packages/connectors/src/outbound`), nunca `fetch` direto.
+- Verifique o código de saída dos comandos: `pnpm -s …` omite a saída de erro.
 
 ## Mapa
 `apps/api` · `apps/worker` · `apps/web` · `packages/{domain,connectors,contracts,db,tracker}` · `docs/`

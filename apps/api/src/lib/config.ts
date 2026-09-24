@@ -1,3 +1,4 @@
+import { outboundPolicyFromEnv, type SafeHttpPolicy } from "@tracker/connectors";
 import { z } from "zod";
 
 /**
@@ -37,6 +38,9 @@ const schema = z.object({
     .string()
     .default("false")
     .transform((v) => v === "true"),
+  // API pública: limites por minuto (chave e organização), compartilhados entre instâncias via banco.
+  API_RATE_LIMIT_PER_KEY: z.coerce.number().int().positive().default(120),
+  API_RATE_LIMIT_PER_ORG: z.coerce.number().int().positive().default(600),
   MFA_REQUIRED_DEFAULT: z
     .string()
     .optional()
@@ -48,6 +52,8 @@ export type AppConfig = z.infer<typeof schema> & {
   corsOrigins: string[];
   tokenHmacKey: Buffer;
   mfaRequiredDefault: boolean;
+  /** Política anti-SSRF de saída (webhooks de saída), mesma regra do worker. */
+  outboundPolicy: SafeHttpPolicy;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -75,5 +81,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     corsOrigins: c.CORS_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean),
     tokenHmacKey: Buffer.from(c.TOKEN_HMAC_SECRET, "base64"),
     mfaRequiredDefault: c.MFA_REQUIRED_DEFAULT ?? c.APP_ENV === "production",
+    outboundPolicy: outboundPolicyFromEnv(env),
   };
 }

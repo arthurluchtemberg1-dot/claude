@@ -40,3 +40,14 @@ Procedimentos para incidentes comuns. Comandos assumem acesso ao ambiente e ao `
 
 ## Restauração de backup
 - Ainda não automatizado nem testado (T69, R42-05). Procedimento previsto: `pg_dump -Fc` diário do banco, restauração em banco novo, `pnpm db:status`, validação de contagens e somas do razão por organização, e rotação das credenciais se o backup tiver sido exposto (as credenciais estão cifradas com chaves fora do banco).
+
+## Chave de API vazada ou uso suspeito
+1. API e webhooks → revogar a chave (efeito imediato, `401 api_key_revoked`); criar outra com escopos mínimos e projetos restritos.
+2. Uso da chave: rotas, status e `request_id` das últimas chamadas (sem conteúdo). Picos de `429` indicam laço no cliente.
+3. Vendas importadas pela chave aparecem na auditoria como `order.manual_created` com `actor_type = api_key`; correções por estorno/ajuste, nunca apagando lançamentos.
+
+## Webhook de saída falhando
+1. API e webhooks → Entregas: `retry_scheduled` (nova tentativa agendada), `dead` (tentativas esgotadas), `blocked` (destino recusado pela política anti-SSRF — o endereço resolveu para rede interna ou o redirecionamento apontou para lá).
+2. Corrija o destino e use "Enviar teste"; depois "Reenviar" nas entregas da fila de falhas (mesmo `X-Tracker-Webhook-Id`, o receptor deduplica).
+3. Segredo vazado: "Rotacionar segredo" — por 24 h as entregas levam as duas assinaturas; depois só a nova.
+4. Loop entre sistemas: entradas com `X-Tracker-Hop` acima de 3 são recusadas (`508`) e aparecem em rejeições do endpoint.

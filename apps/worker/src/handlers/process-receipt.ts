@@ -12,6 +12,7 @@ import {
   type ReversalState,
   type TransactionState,
 } from "@tracker/domain";
+import { queueWebhookEvent } from "./webhooks-out";
 
 /**
  * Processamento de um recebimento (R09-07..R09-10). Executado pelo worker numa transação com contexto
@@ -260,7 +261,8 @@ export async function processReceipt(c: PoolClient, orgId: string, receiptId: st
        values ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10)
        on conflict (organization_id, provider_account_id, external_order_id) do update set updated_at = now(),
          parent_external_order_id = coalesce(public.orders.parent_external_order_id, excluded.parent_external_order_id)
-       returning id, project_id, provider_account_id, external_order_id, parent_external_order_id, parent_order_id, declared_tracking, source_first_occurred_at, source_updated_at, currency`,
+       returning id, project_id, provider_account_id, external_order_id, parent_external_order_id, parent_order_id, declared_tracking, source_first_occurred_at, source_updated_at, currency,
+         financial_status, (xmax = 0) as inserted`,
       [orgId, rec.project_id, conn.provider, rec.provider_account_id, ev.externalOrderId, ev.isTest || rec.is_test, rec.is_demo, ev.occurredAt, rec.received_at, ev.parentExternalOrderId],
     );
     const order = o.rows[0];
@@ -351,6 +353,26 @@ export async function processReceipt(c: PoolClient, orgId: string, receiptId: st
         "insert into public.outbox (organization_id, topic, payload, dedup_key, priority) values ($1, 'destinations.fanout', $2, $3, 4) on conflict do nothing",
         [orgId, JSON.stringify({ order_id: orderId, transaction_key: txKey }), `fanout:${orderId}:${txKey}`],
       );
+    }
+    // Webhooks de saída (R33-05): somente fatos novos deste recebimento; hop = saltos declarados na entrada + 1 (R33-07).
+    const hop = Number(rec.hop ?? 0) + 1;
+    for (const txKey of newlyApproved) {
+      await queueWebhookEvent(c, orgId, { type: "order.approved", eventId: `order.approved:${orderId}:${txKey}`, orderId, transactionKey: txKey, receiptId, hop });
+    }
+    for (const l of ledger.filter((x) => x.type === "refund" || x.type === "chargeback")) {
+      await queueWebhookEvent(c, orgId, { type: "order.reversed", eventId: `order.reversed:${orderId}:${l.semanticKey}`, orderId, ledgerKey: l.semanticKey, receiptId, hop });
+    }
+    const previousStatus = order.inserted ? null : (order.financial_status as string);
+    if (previousStatus !== status && !(previousStatus === null && status === "pending")) {
+      await queueWebhookEvent(c, orgId, {
+        type: "order.status_changed",
+        eventId: `order.status_changed:${orderId}:${receiptId}:${seq}`,
+        orderId,
+        fromStatus: previousStatus ?? "new",
+        toStatus: status,
+        receiptId,
+        hop,
+      });
     }
   }
   await c.query("update public.webhook_receipts set status = 'processed', status_reason = null, processed_at = $2, attempts = attempts + 1 where id = $1", [receiptId, now]);

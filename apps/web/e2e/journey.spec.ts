@@ -141,6 +141,21 @@ test("T70 jornada completa: cadastro → conexão Lowify → visita com SDK → 
   await expect(page.getByRole("button", { name: /Receita após estornos: R\$\s0,00/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Receita bruta aprovada: R\$\s199,90/ })).toBeVisible();
 
+  // 7b. API pública: chave exibida uma única vez e usável; revogação imediata.
+  await page.goto("/api-webhooks");
+  await page.getByRole("button", { name: "Criar chave" }).click();
+  const shown = (await page.locator("code", { hasText: /^tk_live_/ }).textContent())!;
+  expect(shown).toMatch(/^tk_live_[A-Za-z0-9]{8}_[A-Za-z0-9]{40}$/);
+  const apiOrders = await request.get(`${E2E.apiUrl}/public/v1/orders`, { headers: { authorization: `Bearer ${shown}` } });
+  expect(apiOrders.status()).toBe(200);
+  expect((await apiOrders.json()).data.map((o: { external_order_id: string }) => o.external_order_id)).toContain(orderId);
+  await page.getByRole("button", { name: "Já guardei" }).click();
+  await expect(page.locator("code", { hasText: /^tk_live_/ })).toHaveCount(0);
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Revogar" }).first().click();
+  await expect(page.getByText("revogada", { exact: true })).toBeVisible();
+  expect((await request.get(`${E2E.apiUrl}/public/v1/orders`, { headers: { authorization: `Bearer ${shown}` } })).status()).toBe(401);
+
   // 8. Diagnóstico e integrações refletem estado real
   await page.goto("/integracoes");
   await expect(page.getByText("Conectada", { exact: true })).toBeVisible();

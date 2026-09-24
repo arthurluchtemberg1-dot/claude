@@ -65,6 +65,10 @@ Hierarquia: token do SDK devolvido pelo checkout (liga pedido→visitante; upsel
 
 `apps/api/src/services/metrics-repo.ts` produz somas/contagens com um único escopo de pedidos (`orderScopeSql`) e uma única regra de gasto (`chosenSpendSql`: uma fonte por entidade/dia e um nível por conta/dia); fórmulas ficam no domínio. `services/breakdown.ts` (`GET /v1/reports/breakdown`) agrega gasto e créditos de atribuição separadamente e só então combina por ID externo (campanha/conjunto/anúncio/rede), com frações exatas arredondadas na saída; gasto sem ID é `indisponível`, nunca zero, e o gasto não detalhável no nível é explicitado.
 
+## API pública e webhooks de saída (seção 33)
+
+`/public/v1` (plugin `apps/api/src/public`): chave Bearer → `app.resolve_api_key` (HMAC) → escopos, projetos e ambiente; limite por chave/organização em janelas no banco; `Idempotency-Key` registrada na mesma transação da criação; uso sem conteúdo em `api_key_usage`; OpenAPI em `/public/v1/openapi.json` (teste exige todas as rotas documentadas); sem CORS. Webhooks de saída: fatos novos do processamento geram `webhooks.emit` na outbox → uma entrega por (assinatura, evento) → `webhooks.deliver` fora da transação com `safeRequest` (anti-SSRF), assinatura com timestamp e ID, backoff, fila de falhas e contador de saltos contra loops.
+
 ## Destinos de conversão (seção 17)
 
 Destino nasce `disabled`; ativação exige emissor responsável (`server`/`browser`/`checkout_native`) e passagem por `test_mode`. Entrega única por `(destino, purchase:{pedido}:{transação}, ambiente)`; `event_id` determinístico. HTTP fora da transação; `timeout` → `unknown_outcome` e repetição apenas com o mesmo `event_id` dentro da janela de deduplicação (hipótese de 48 h a revalidar); 429/5xx → backoff com jitter; 5 falhas seguidas abrem circuit breaker por destino por 5 min. `ALLOW_EXTERNAL_DELIVERY=false` impede qualquer chamada externa.

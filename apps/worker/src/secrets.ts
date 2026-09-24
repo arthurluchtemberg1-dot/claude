@@ -35,3 +35,18 @@ export function createSecretLoader(keysEnv = process.env.CREDENTIALS_KEYS ?? "")
     return decrypt(keys, r.rows[0].ciphertext, `${orgId}:${connectionId ?? "-"}:${purpose}`);
   };
 }
+
+/** Segredos de assinatura de webhook de saída (atual e, na transição de 24 h, o anterior). */
+export function createSubscriptionSecretLoader(keysEnv = process.env.CREDENTIALS_KEYS ?? "", transitionHours = 24) {
+  const keys = parseKeys(keysEnv);
+  return async (c: PoolClient, orgId: string, subscriptionId: string): Promise<string[]> => {
+    const r = await c.query(
+      `select ciphertext from private.credentials
+        where organization_id = $1 and subscription_id = $2 and purpose = 'outbound_signing_secret' and revoked_at is null
+          and (rotated_at is null or rotated_at > now() - make_interval(hours => $3))
+        order by (rotated_at is null) desc, created_at desc limit 2`,
+      [orgId, subscriptionId, transitionHours],
+    );
+    return r.rows.map((x) => decrypt(keys, x.ciphertext, `${orgId}:sub:${subscriptionId}:outbound_signing_secret`));
+  };
+}

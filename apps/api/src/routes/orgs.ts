@@ -221,7 +221,8 @@ export const orgRoutes =
           [org.id, body.name, newPublicKey(), body.timezone ?? null, body.currency ?? null, body.allowed_origins.map((o) => new URL(o).origin)],
         );
         await audit(c, { organizationId: org.id, actorId: auth.userId, action: "project.created", targetType: "project", targetId: r.rows[0].id, requestId: req.id });
-        return reply.status(201).send(r.rows[0]);
+        reply.status(201);
+        return r.rows[0];
       });
     });
 

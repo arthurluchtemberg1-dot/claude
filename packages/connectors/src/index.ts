@@ -4,6 +4,9 @@ export * from "./checkout/canonical";
 export * from "./destinations/meta-capi";
 export * from "./ads/meta-ads";
 export * from "./catalog";
+export * from "./outbound/safe-http";
+export * from "./outbound/signature";
+export * from "./outbound/deliver";
 
 import { canonicalConnector } from "./checkout/canonical";
 import { lowifyConnector } from "./checkout/lowify";

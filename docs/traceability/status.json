@@ -2434,8 +2434,8 @@
     },
     {
       "status": "done",
-      "impl": "POST /v1/orders/manual (auditado, provedor \"manual\")",
-      "tests": "webhook-pipeline.test.ts",
+      "impl": "POST /v1/orders/manual e POST /public/v1/sales (serviço createManualSale; auditado com actor_type user/api_key; provedor \"manual\")",
+      "tests": "webhook-pipeline.test.ts; public-api.test.ts",
       "dep": "",
       "note": "",
       "id": "R24-05",
@@ -3153,63 +3153,63 @@
       "stage": "E8"
     },
     {
-      "status": "partial",
-      "impl": "api_keys (hash) + resolve_api_key; API pública versionada pendente",
-      "tests": "",
+      "status": "done",
+      "impl": "/public/v1 (apps/api/src/public): chaves tk_live/tk_test com hash HMAC, escopos, projetos, expiração/revogação; cursor; OpenAPI 3.1 em /public/v1/openapi.json",
+      "tests": "public-api.test.ts (chaves, escopos, projeto, cursor, OpenAPI cobre todas as rotas)",
       "dep": "",
       "note": "",
       "id": "R33-01",
       "stage": "E8"
     },
     {
-      "status": "planned",
-      "impl": "Etapa E8",
-      "tests": "",
+      "status": "partial",
+      "impl": "Pedidos, importação de vendas, métricas, campanhas, produtos e estado das integrações; nada administrativo",
+      "tests": "public-api.test.ts",
       "dep": "",
-      "note": "",
+      "note": "Leads e eventos próprios ainda não expostos (sem módulo de leads)",
       "id": "R33-02",
       "stage": "E8"
     },
     {
-      "status": "planned",
-      "impl": "Etapa E8",
-      "tests": "",
+      "status": "done",
+      "impl": "Janelas por chave e organização no PostgreSQL com cabeçalhos RateLimit-* e Retry-After; Idempotency-Key obrigatória em POST /sales (replay, 422 em corpo diferente)",
+      "tests": "public-api.test.ts",
       "dep": "",
-      "note": "",
+      "note": "D-020",
       "id": "R33-03",
       "stage": "E8"
     },
     {
-      "status": "partial",
-      "impl": "Erro consistente com request_id em toda a API",
-      "tests": "—",
+      "status": "done",
+      "impl": "Contrato de erro com código/mensagem/request_id (inclui 404 de rota); versionamento e política de descontinuação em docs/API.md; sandbox (tk_test_); uso por chave sem conteúdo; último acesso; revogação",
+      "tests": "public-api.test.ts; outbound.test.ts (exemplo documentado executado)",
       "dep": "",
       "note": "",
       "id": "R33-04",
       "stage": "E8"
     },
     {
-      "status": "planned",
-      "impl": "Etapa E8",
-      "tests": "",
+      "status": "done",
+      "impl": "webhook_subscriptions (nasce pausada; ativação após test.ping 2xx), eventos selecionáveis, projetos, assinatura t/id/v1 com dupla assinatura na rotação (24 h), backoff, fila de falhas e reenvio",
+      "tests": "webhooks-out.test.ts; outbound.test.ts",
       "dep": "",
       "note": "",
       "id": "R33-05",
       "stage": "E8"
     },
     {
-      "status": "planned",
-      "impl": "Etapa E8",
-      "tests": "",
+      "status": "done",
+      "impl": "packages/connectors/src/outbound/safe-http.ts: bloqueio de privados/loopback/link-local/metadata/CGNAT/IPv6 especiais, esquemas e credenciais; DNS validado na conexão; redirects revalidados (máx. 3, só 307/308); timeout e limite de resposta",
+      "tests": "outbound.test.ts (T67); webhooks-out.test.ts",
       "dep": "",
       "note": "",
       "id": "R33-06",
       "stage": "E8"
     },
     {
-      "status": "planned",
-      "impl": "Etapa E8",
-      "tests": "",
+      "status": "done",
+      "impl": "X-Tracker-Hop propagado; entrada recusa salto > 3 (508); evento no limite processado sem reemissão; proveniência (receipt_id, fonte, hop) no payload; host do próprio sistema proibido como destino",
+      "tests": "webhooks-out.test.ts",
       "dep": "",
       "note": "",
       "id": "R33-07",
@@ -3576,9 +3576,9 @@
       "stage": "E1+"
     },
     {
-      "status": "partial",
-      "impl": "CSV injection neutralizado; SSRF/upload pendentes (webhooks de saída ainda não existem)",
-      "tests": "webhook-pipeline.test.ts (T66)",
+      "status": "done",
+      "impl": "CSV injection neutralizado; SSRF em webhooks de saída (safeRequest); upload de arquivos ainda inexistente",
+      "tests": "webhook-pipeline.test.ts (T66); outbound.test.ts (T67)",
       "dep": "",
       "note": "",
       "id": "R40-12",
@@ -3604,8 +3604,8 @@
     },
     {
       "status": "partial",
-      "impl": "Revogação de endpoints/credenciais/convites/sessões",
-      "tests": "auth-isolation.test.ts",
+      "impl": "Revogação de endpoints/credenciais/convites/sessões/chaves de API/segredos de webhooks de saída",
+      "tests": "auth-isolation.test.ts; public-api.test.ts; webhooks-out.test.ts",
       "dep": "",
       "note": "",
       "id": "R40-15",
@@ -4260,8 +4260,8 @@
     },
     {
       "id": "T67",
-      "status": "planned",
-      "evidence": "Webhooks de saída + SSRF (E8)"
+      "status": "done",
+      "evidence": "outbound.test.ts (IPs internos, IPv6/mapeados, DNS na conexão, redirect para interno/metadata/rebind); webhooks-out.test.ts (cadastro bloqueado)"
     },
     {
       "id": "T68",

@@ -126,7 +126,8 @@ export const costRoutes =
           [org.id, body.project_id, body.network, body.external_account_id, body.name, body.currency, body.timezone],
         );
         await audit(c, { organizationId: org.id, actorId: auth.userId, action: "ad_account.created", targetType: "ad_account", targetId: r.rows[0].id, requestId: req.id });
-        return reply.status(201).send({ id: r.rows[0].id });
+        reply.status(201);
+        return { id: r.rows[0].id };
       });
     });
 
@@ -260,9 +261,13 @@ export const costRoutes =
            values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'manual',$10,$11) on conflict (organization_id, dedup_key) do nothing returning id`,
           [org.id, body.project_id, body.category, countsAsMedia, body.description, amount, body.currency, body.period_start, body.period_end, dedup, auth.userId],
         );
-        if (!r.rows[0]) return reply.status(409).send({ error: { code: "duplicate", message: "Custo idêntico já cadastrado", request_id: req.id } });
+        if (!r.rows[0]) {
+          reply.status(409);
+          return { error: { code: "duplicate", message: "Custo idêntico já cadastrado", request_id: req.id } };
+        }
         await audit(c, { organizationId: org.id, actorId: auth.userId, action: "cost_entry.created", targetType: "cost_entry", targetId: r.rows[0].id, details: { category: body.category, amount: body.amount, currency: body.currency }, requestId: req.id });
-        return reply.status(201).send({ id: r.rows[0].id, counts_as_media: countsAsMedia });
+        reply.status(201);
+        return { id: r.rows[0].id, counts_as_media: countsAsMedia };
       });
     });
 
@@ -293,7 +298,8 @@ export const costRoutes =
           [org.id, body.provider_account_id, body.name, body.percent_bp, parseDecimalToMinor(body.fixed, body.currency), body.currency, body.valid_from, body.valid_to, auth.userId],
         );
         await audit(c, { organizationId: org.id, actorId: auth.userId, action: "fee_schedule.created", targetType: "fee_schedule", targetId: r.rows[0].id, details: body, requestId: req.id });
-        return reply.status(201).send({ id: r.rows[0].id });
+        reply.status(201);
+        return { id: r.rows[0].id };
       });
     });
 
@@ -311,7 +317,8 @@ export const costRoutes =
           [org.id, body.from_currency, body.to_currency, body.rate, body.as_of_date, body.source, auth.userId],
         );
         await audit(c, { organizationId: org.id, actorId: auth.userId, action: "exchange_rate.created", details: body, requestId: req.id });
-        return reply.status(201).send({ id: r.rows[0]?.id ?? null });
+        reply.status(201);
+        return { id: r.rows[0]?.id ?? null };
       });
     });
 

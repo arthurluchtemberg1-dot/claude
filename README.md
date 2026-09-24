@@ -7,7 +7,7 @@ Plataforma de rastreamento de vendas e gestão de performance: vendas confirmada
 ## Estrutura
 
 ```
-apps/api        API Fastify (auth, organizações, webhooks, coleta do SDK, vendas, métricas, diagnóstico, destinos, custos)
+apps/api        API Fastify (auth, organizações, webhooks, coleta do SDK, vendas, métricas, diagnóstico, destinos, custos, API pública /public/v1)
 apps/worker     Relay outbox→BullMQ, processamento, atribuição, entregas a destinos
 apps/web        Painel Next.js 16 (React 19, Tailwind 4) + E2E Playwright
 packages/domain Regras de negócio puras (dinheiro, fuso, agregado financeiro, métricas, atribuição, UTMs, permissões)
@@ -82,4 +82,4 @@ API e worker são processos persistentes (não serverless) com `/health` e `/rea
 
 - [Arquitetura](docs/ARCHITECTURE.md) · [Decisões](docs/DECISIONS.md) · [Dicionário de métricas](docs/METRICS_DICTIONARY.md)
 - [Matriz de rastreabilidade](docs/REQUIREMENTS_TRACEABILITY.md) · [Integrações](docs/INTEGRATIONS_MATRIX.md) · [Dependências externas](docs/EXTERNAL_DEPENDENCIES.md)
-- [Webhook canônico assinado](docs/integrations/CANONICAL_WEBHOOK.md) · [SDK](docs/SDK.md) · [Runbooks](docs/RUNBOOKS.md)
+- [Webhook canônico assinado](docs/integrations/CANONICAL_WEBHOOK.md) · [SDK](docs/SDK.md) · [API pública e webhooks de saída](docs/API.md) · [Runbooks](docs/RUNBOOKS.md)

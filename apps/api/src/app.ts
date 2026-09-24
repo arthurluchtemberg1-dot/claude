@@ -21,9 +21,13 @@ import { destinationRoutes } from "./routes/destinations";
 import { costRoutes } from "./routes/costs";
 import { utmRoutes } from "./routes/utm";
 import { healthRoutes } from "./routes/health";
+import { apiManagementRoutes } from "./routes/api-management";
+import { publicApi } from "./public/plugin";
 
 /** Rotas públicas sem cookie (CORS aberto, sem credenciais): coleta do SDK e webhooks. */
 const PUBLIC_PREFIXES = ["/v1/collect", "/v1/webhooks/", "/sdk/", "/health", "/ready"];
+/** API pública por chave: sem cookie/CSRF e SEM CORS (uso servidor a servidor; chave nunca no navegador). */
+const PUBLIC_API_PREFIX = "/public/";
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
@@ -46,6 +50,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(cors, {
     delegator: (req, cb) => {
       const url = req.url ?? "";
+      if (url.startsWith(PUBLIC_API_PREFIX)) return cb(null, { origin: false });
       if (PUBLIC_PREFIXES.some((p) => url.startsWith(p))) return cb(null, { origin: true, credentials: false, methods: ["GET", "POST"] });
       cb(null, { origin: deps.config.corsOrigins, credentials: true, methods: ["GET", "POST", "PATCH", "PUT", "DELETE"] });
     },
@@ -54,7 +59,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.addHook("onRequest", async (req, reply) => {
     reply.header("x-request-id", req.id);
     const url = req.url;
-    if (PUBLIC_PREFIXES.some((p) => url.startsWith(p))) return;
+    if (url.startsWith(PUBLIC_API_PREFIX) || PUBLIC_PREFIXES.some((p) => url.startsWith(p))) return;
     // Proteção CSRF para autenticação por cookie: mutações exigem Origin permitido (R40-03).
     if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") {
       const origin = req.headers.origin;
@@ -92,6 +97,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return reply.status(500).send({ error: { code: "internal_error", message: "Erro interno. Use o request_id ao contatar o suporte.", request_id: req.id } });
   });
 
+  app.setNotFoundHandler((req, reply) => reply.status(404).send({ error: { code: "not_found", message: "Rota não encontrada", request_id: req.id } }));
+
   await app.register(healthRoutes(deps));
   await app.register(authRoutes(deps), { prefix: "/v1/auth" });
   await app.register(orgRoutes(deps), { prefix: "/v1" });
@@ -103,6 +110,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(destinationRoutes(deps), { prefix: "/v1" });
   await app.register(costRoutes(deps), { prefix: "/v1" });
   await app.register(utmRoutes(), { prefix: "/v1" });
+  await app.register(apiManagementRoutes(deps), { prefix: "/v1" });
+  await app.register(publicApi(deps), { prefix: "/public/v1" });
   await app.register(ingestRoutes(deps));
   return app;
 }

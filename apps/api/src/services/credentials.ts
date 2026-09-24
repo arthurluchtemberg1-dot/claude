@@ -54,3 +54,33 @@ export async function loadCredential(
 export async function revokeCredentials(c: PoolClient, organizationId: string, connectionId: string) {
   await c.query("update private.credentials set revoked_at = now() where organization_id = $1 and connection_id = $2 and revoked_at is null", [organizationId, connectionId]);
 }
+
+// ---------------------------------------------------------------- segredos de webhooks de saída
+
+const subAad = (orgId: string, subscriptionId: string) => `${orgId}:sub:${subscriptionId}:outbound_signing_secret`;
+
+/** Grava novo segredo de assinatura; o anterior fica válido por 24 h (dupla assinatura na transição). */
+export async function storeSubscriptionSecret(c: PoolClient, config: AppConfig, orgId: string, subscriptionId: string, value: string) {
+  const enc = encryptSecret({ keys: config.credentialKeys, current: config.CREDENTIALS_KEY_CURRENT }, value, subAad(orgId, subscriptionId));
+  await c.query(
+    "update private.credentials set rotated_at = now() where organization_id = $1 and subscription_id = $2 and purpose = 'outbound_signing_secret' and revoked_at is null and rotated_at is null",
+    [orgId, subscriptionId],
+  );
+  await c.query(
+    "insert into private.credentials (organization_id, subscription_id, purpose, ciphertext, key_version) values ($1, $2, 'outbound_signing_secret', $3, $4)",
+    [orgId, subscriptionId, enc.ciphertext, enc.keyVersion],
+  );
+}
+
+/** Segredos válidos para assinar: atual primeiro e, durante a transição, o anterior. */
+export async function loadSubscriptionSecrets(c: PoolClient, config: AppConfig, orgId: string, subscriptionId: string, transitionHours = 24): Promise<string[]> {
+  const r = await c.query(
+    `select ciphertext, rotated_at from private.credentials
+      where organization_id = $1 and subscription_id = $2 and purpose = 'outbound_signing_secret' and revoked_at is null
+        and (rotated_at is null or rotated_at > now() - make_interval(hours => $3))
+      order by (rotated_at is null) desc, created_at desc limit 2`,
+    [orgId, subscriptionId, transitionHours],
+  );
+  const keys = { keys: config.credentialKeys, current: config.CREDENTIALS_KEY_CURRENT };
+  return r.rows.map((x) => decryptSecret(keys, x.ciphertext, subAad(orgId, subscriptionId)));
+}

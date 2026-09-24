@@ -4,7 +4,8 @@ import { Redis } from "ioredis";
 import pino from "pino";
 import { createPool, requireEnv } from "@tracker/db";
 import { dispatchOutboxItem, type WorkerDeps } from "./dispatch";
-import { createSecretLoader } from "./secrets";
+import { outboundPolicyFromEnv } from "@tracker/connectors";
+import { createSecretLoader, createSubscriptionSecretLoader } from "./secrets";
 import { OUTBOX_QUEUE, relayOnce } from "./relay";
 
 /**
@@ -29,6 +30,7 @@ const deps: WorkerDeps = {
     fetchImpl: fetch,
     loadSecret: createSecretLoader(),
   },
+  outbound: { policy: outboundPolicyFromEnv(process.env), loadSecrets: createSubscriptionSecretLoader() },
 };
 
 const worker = new Worker(

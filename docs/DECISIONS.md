@@ -65,3 +65,15 @@ Formato: decisão · contexto · alternativas rejeitadas · consequências. Reve
 ## D-018 — Gasto: um nível por conta **e por dia**; entidades importadas por CSV
 - Antes o nível era escolhido por conta no período inteiro, o que descartava dias importados em outro nível. Agora o total usa o nível mais agregado disponível em cada dia; o detalhamento por campanha usa o nível mais agregado abaixo da conta e explicita o gasto não detalhável.
 - A importação CSV registra entidades (`ad_entities.source = 'csv'`) e o histórico de nomes com datas da conta; o nome exibido é o de observação mais recente e a junção é sempre por ID (T39). Correção junto: o papel da API não tinha permissão de escrita em `ad_entity_names`, o que fazia falhar toda importação por campanha com nomes.
+
+## D-019 — API pública com papel de sistema restrito à organização da chave
+- Não há usuário numa chamada por chave, então `tracker_app` (que exige membro) não se aplica. As rotas `/public/v1` usam `tracker_system` com `app.org_id` da chave (RLS ainda isola a organização) e filtros explícitos de projeto e ambiente (sandbox ⇒ só `is_test`). Nada administrativo é exposto; chave com hash HMAC, prefixo para exibição.
+
+## D-020 — Limite de taxa em janelas no PostgreSQL
+- Janela fixa de 1 minuto por chave e por organização em `api_rate_windows` (uma escrita por requisição), consistente entre instâncias sem depender do Redis na API. Evolução: mover para Redis se o volume tornar a escrita relevante.
+
+## D-021 — Webhooks de saída verificados antes de ativar e com política anti-SSRF única
+- Assinatura nasce pausada; ativação exige `test.ping` assinado respondido com 2xx (prova de controle do destino). API e worker usam `outboundPolicyFromEnv` + `safeRequest` (DNS validado na conexão, redirecionamentos revalidados, só 307/308). Rede privada só com `OUTBOUND_ALLOW_PRIVATE_NETWORKS=true`, recusado em produção.
+
+## D-022 — Resposta somente após o COMMIT
+- Descoberto em teste: rotas que chamavam `reply.send()` dentro do callback da transação respondiam antes do COMMIT (cliente podia usar uma chave/conta ainda invisível, ou receber sucesso de algo revertido). Regra: dentro da transação só `reply.status()`; o corpo é retornado e enviado depois. Teste de regressão determinístico com COMMIT atrasado por gatilho adiado.

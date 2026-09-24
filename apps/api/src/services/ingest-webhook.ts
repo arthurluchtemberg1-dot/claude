@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { CHECKOUT_CONNECTORS } from "@tracker/connectors";
+import { CHECKOUT_CONNECTORS, HOP_HEADER, MAX_FORWARD_HOPS } from "@tracker/connectors";
 import { withTx } from "@tracker/db";
 import type { AppDeps } from "../context";
 import { hmacToken } from "../lib/crypto";
@@ -36,6 +36,17 @@ export async function receiveWebhook(
   const headers: Record<string, string | undefined> = {};
   for (const [k, v] of Object.entries(input.headers)) headers[k.toLowerCase()] = Array.isArray(v) ? v[0] : v;
   const orgId = resolved.organization_id as string;
+
+  // Proveniência de encaminhamento (R33-07): saltos declarados por webhooks de saída do Tracker. Acima do limite o
+  // evento é recusado para impedir loops (ex.: webhook de saída apontado, direta ou indiretamente, para esta entrada).
+  const hopHeader = headers[HOP_HEADER];
+  const hop = hopHeader && /^\d{1,2}$/.test(hopHeader) ? Number(hopHeader) : 0;
+  if (hop > MAX_FORWARD_HOPS) {
+    await withTx(deps.pools.system, { organizationId: orgId }, (c) =>
+      c.query("insert into public.webhook_rejections (organization_id, endpoint_id, reason) values ($1, $2, $3)", [orgId, resolved.endpoint_id, `Limite de encaminhamento excedido (salto ${hop})`]),
+    ).catch(() => undefined);
+    return { status: 508, body: { error: "loop_detected" } };
+  }
 
   let body: unknown = null;
   let parseError: string | null = null;
@@ -74,8 +85,8 @@ export async function receiveWebhook(
     const r = await c.query(
       `insert into public.webhook_receipts
          (organization_id, project_id, connection_id, endpoint_id, provider, provider_account_id, dedup_key, dedup_method,
-          source_event_type, received_at, body, body_sha256, content_type, headers, auth_method, status, status_reason, is_test, is_demo)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+          source_event_type, received_at, body, body_sha256, content_type, headers, auth_method, status, status_reason, is_test, is_demo, hop)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        on conflict (organization_id, provider_account_id, dedup_key)
        do update set delivery_count = public.webhook_receipts.delivery_count + 1, last_delivery_at = excluded.received_at
        returning id, (xmax = 0) as inserted, body_sha256`,
@@ -99,6 +110,7 @@ export async function receiveWebhook(
         parseError,
         resolved.environment === "test",
         resolved.is_demo,
+        hop,
       ],
     );
     const row = r.rows[0] as { id: string; inserted: boolean; body_sha256: Buffer };

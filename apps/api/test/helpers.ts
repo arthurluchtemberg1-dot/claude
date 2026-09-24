@@ -52,6 +52,11 @@ export async function createHarness(overrides: Partial<Record<string, string>> =
       loadSecret: (await import("@tracker/worker")).createSecretLoader(process.env.CREDENTIALS_KEYS),
       timeoutMs: 500,
     },
+    // Testes: somente destinos locais (rede privada liberada, envio externo desligado).
+    outbound: {
+      policy: { allowPrivateNetworks: true, allowPublicNetworks: false, requireHttps: false, timeoutMs: 2000, maxRedirects: 3, maxResponseBytes: 64 * 1024, blockedHosts: ["localhost"] },
+      loadSecrets: (await import("@tracker/worker")).createSubscriptionSecretLoader(process.env.CREDENTIALS_KEYS),
+    },
   };
   return {
     app,

@@ -8,7 +8,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
 import { createPool, requireEnv, withTx } from "@tracker/db";
 import { drainOutbox, type WorkerDeps } from "../dispatch";
-import { createSecretLoader } from "../secrets";
+import { createSecretLoader, createSubscriptionSecretLoader } from "../secrets";
 
 // pnpm repassa "--" literalmente; é removido para aceitar `pnpm db:seed:demo -- --email ...`.
 const { values } = parseArgs({ args: process.argv.slice(2).filter((a) => a !== "--"), options: { email: { type: "string" }, days: { type: "string", default: "14" } } });
@@ -68,6 +68,8 @@ const deps: WorkerDeps = {
   now: () => new Date(),
   log: () => undefined,
   delivery: { environment: "demo", allowExternalDelivery: false, fetchImpl: fetch, loadSecret: createSecretLoader() },
+  // Demonstração nunca envia nada para fora (T68): sem rede pública nem privada.
+  outbound: { policy: { allowPrivateNetworks: false, allowPublicNetworks: false, requireHttps: true }, loadSecrets: createSubscriptionSecretLoader() },
 };
 const processed = await drainOutbox(deps, { maxRounds: 50 });
 console.log(`Organização de demonstração criada (${orgId}); ${processed} itens processados. Selecione-a no painel.`);

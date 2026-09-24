@@ -8,18 +8,18 @@ Atualizado em: 2026-09-24. Estados de requisito conforme R11-03/R46-01: "Impleme
 
 | Estado | Requisitos |
 | --- | --- |
-| ✅ Implementado localmente | 208 |
-| 🟡 Parcial | 81 |
+| ✅ Implementado localmente | 215 |
+| 🟡 Parcial | 79 |
 | ⛔ Bloqueado externamente | 12 |
-| ⏳ Planejado | 122 |
+| ⏳ Planejado | 117 |
 | 📄 Método/documento | 13 |
 | **Total** | **436** |
 
 | Cenários de teste (seção 43) | Quantidade |
 | --- | --- |
-| ✅ Automatizado e executado | 54 |
+| ✅ Automatizado e executado | 55 |
 | 🟡 Parcial | 2 |
-| ⏳ Planejado | 13 |
+| ⏳ Planejado | 12 |
 | ⛔ Bloqueado | 1 |
 
 ## Cenários obrigatórios T01–T70
@@ -92,7 +92,7 @@ Atualizado em: 2026-09-24. Estados de requisito conforme R11-03/R46-01: "Impleme
 | T64 | ⏳ Planejado | SaaS (E8) |
 | T65 | ⏳ Planejado | SaaS (E8) |
 | T66 | ✅ Automatizado e executado | webhook-pipeline.test.ts |
-| T67 | ⏳ Planejado | Webhooks de saída + SSRF (E8) |
+| T67 | ✅ Automatizado e executado | outbound.test.ts (IPs internos, IPv6/mapeados, DNS na conexão, redirect para interno/metadata/rebind); webhooks-out.test.ts (cadastro bloqueado) |
 | T68 | ✅ Automatizado e executado | canonical-meta.test.ts; deliveries-relay.test.ts |
 | T69 | ⏳ Planejado | Backup/restore (E9) |
 | T70 | ✅ Automatizado e executado | apps/web/e2e/journey.spec.ts (payload Lowify documentado, local) |
@@ -490,7 +490,7 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R24-02 | Detalhe da venda: linha do tempo, recebimentos, eventos, itens, pagamentos, reembolsos, evidência de atribuição, destinos e conciliação; co… | E2/E3 | ✅ Implementado localmente | apps/web/app/(app)/vendas/[id]; /v1/orders/:id | E2E |  |  |
 | R24-03 | Produtos: grupos, ofertas, planos, preço de referência, custos com vigência, mapeamento de IDs externos por provedor; mesmo nome em checkou… | E2/E3 | 🟡 Parcial | Produto por (conta, ID externo), sem unificar por nome | webhook-pipeline.test.ts |  | Grupos/ofertas/planos e custos por produto pendentes |
 | R24-04 | Clientes: histórico, primeira compra, recorrência, receita/contribuição, consentimentos, vínculos; deduplicação explicável e reversível; se… | E2/E3 | ⏳ Planejado | Visão de clientes |  |  |  |
-| R24-05 | Vendas manuais/offline por API ou formulário com permissão, origem, comprovante e auditoria; confirmação manual ≠ checkout; correções por a… | E2/E3 | ✅ Implementado localmente | POST /v1/orders/manual (auditado, provedor "manual") | webhook-pipeline.test.ts |  |  |
+| R24-05 | Vendas manuais/offline por API ou formulário com permissão, origem, comprovante e auditoria; confirmação manual ≠ checkout; correções por a… | E2/E3 | ✅ Implementado localmente | POST /v1/orders/manual e POST /public/v1/sales (serviço createManualSale; auditado com actor_type user/api_key; provedor "manual") | webhook-pipeline.test.ts; public-api.test.ts |  |  |
 | R24-06 | E-commerce: pagamento, cancelamento, devolução, frete e atendimento separados; respeitar mecanismos de extensão de cada loja. | E2/E3 | ⏳ Planejado | E-commerce (frete/devolução) |  |  |  |
 
 ### 25. Gestão de campanhas
@@ -615,13 +615,13 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 
 | ID | Requisito | Etapa | Estado | Implementação | Testes | Dependência | Observação |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| R33-01 | REST versionada com OpenAPI, paginação por cursor, filtros coerentes, chaves revogáveis com escopos por organização/projetos; hash da chave… | E8 | 🟡 Parcial | api_keys (hash) + resolve_api_key; API pública versionada pendente |  |  |  |
-| R33-02 | Recursos: métricas, pedidos, produtos, fontes, campanhas, status de integração, leads, eventos, importação de vendas; nada administrativo. | E8 | ⏳ Planejado | Etapa E8 |  |  |  |
-| R33-03 | Rate limit por organização/chave com cabeçalhos; Idempotency-Key em criações/importações. | E8 | ⏳ Planejado | Etapa E8 |  |  |  |
-| R33-04 | Erro consistente com código, mensagem e request ID; versionamento e depreciação; exemplos testados e sandbox; logs de uso sem conteúdo sens… | E8 | 🟡 Parcial | Erro consistente com request_id em toda a API | — |  |  |
-| R33-05 | Webhooks de saída: eventos selecionáveis, destino, ownership, assinatura com timestamp e ID, retries, dead letters, teste explícito, rotaçã… | E8 | ⏳ Planejado | Etapa E8 |  |  |  |
-| R33-06 | Proteção SSRF: bloquear privados, loopback, link-local, metadata e esquemas indevidos; validar DNS e redirects no momento da conexão; limit… | E8 | ⏳ Planejado | Etapa E8 |  |  |  |
-| R33-07 | Webhook de saída que retorna à entrada não cria loop; proveniência e limite de encaminhamento. | E8 | ⏳ Planejado | Etapa E8 |  |  |  |
+| R33-01 | REST versionada com OpenAPI, paginação por cursor, filtros coerentes, chaves revogáveis com escopos por organização/projetos; hash da chave… | E8 | ✅ Implementado localmente | /public/v1 (apps/api/src/public): chaves tk_live/tk_test com hash HMAC, escopos, projetos, expiração/revogação; cursor; OpenAPI 3.1 em /public/v1/openapi.json | public-api.test.ts (chaves, escopos, projeto, cursor, OpenAPI cobre todas as rotas) |  |  |
+| R33-02 | Recursos: métricas, pedidos, produtos, fontes, campanhas, status de integração, leads, eventos, importação de vendas; nada administrativo. | E8 | 🟡 Parcial | Pedidos, importação de vendas, métricas, campanhas, produtos e estado das integrações; nada administrativo | public-api.test.ts |  | Leads e eventos próprios ainda não expostos (sem módulo de leads) |
+| R33-03 | Rate limit por organização/chave com cabeçalhos; Idempotency-Key em criações/importações. | E8 | ✅ Implementado localmente | Janelas por chave e organização no PostgreSQL com cabeçalhos RateLimit-* e Retry-After; Idempotency-Key obrigatória em POST /sales (replay, 422 em corpo diferente) | public-api.test.ts |  | D-020 |
+| R33-04 | Erro consistente com código, mensagem e request ID; versionamento e depreciação; exemplos testados e sandbox; logs de uso sem conteúdo sens… | E8 | ✅ Implementado localmente | Contrato de erro com código/mensagem/request_id (inclui 404 de rota); versionamento e política de descontinuação em docs/API.md; sandbox (tk_test_); uso por chave sem conteúdo; último acesso; revogação | public-api.test.ts; outbound.test.ts (exemplo documentado executado) |  |  |
+| R33-05 | Webhooks de saída: eventos selecionáveis, destino, ownership, assinatura com timestamp e ID, retries, dead letters, teste explícito, rotaçã… | E8 | ✅ Implementado localmente | webhook_subscriptions (nasce pausada; ativação após test.ping 2xx), eventos selecionáveis, projetos, assinatura t/id/v1 com dupla assinatura na rotação (24 h), backoff, fila de falhas e reenvio | webhooks-out.test.ts; outbound.test.ts |  |  |
+| R33-06 | Proteção SSRF: bloquear privados, loopback, link-local, metadata e esquemas indevidos; validar DNS e redirects no momento da conexão; limit… | E8 | ✅ Implementado localmente | packages/connectors/src/outbound/safe-http.ts: bloqueio de privados/loopback/link-local/metadata/CGNAT/IPv6 especiais, esquemas e credenciais; DNS validado na conexão; redirects revalidados (máx. 3, só 307/308); timeout e limite de resposta | outbound.test.ts (T67); webhooks-out.test.ts |  |  |
+| R33-07 | Webhook de saída que retorna à entrada não cria loop; proveniência e limite de encaminhamento. | E8 | ✅ Implementado localmente | X-Tracker-Hop propagado; entrada recusa salto > 3 (508); evento no limite processado sem reemissão; proveniência (receipt_id, fonte, hop) no payload; host do próprio sistema proibido como destino | webhooks-out.test.ts |  |  |
 
 ### 34. Alertas e notificações
 
@@ -697,10 +697,10 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R40-09 | CORS configurado sem ser autenticação; origem/referrer/segredo público não comprovam identidade. | E1+ | ✅ Implementado localmente | CORS delegado; coleta pública sem credenciais; origem não autentica | tracking-attribution.test.ts |  |  |
 | R40-10 | Assinatura de webhooks e anti-replay compatível com retransmissões. | E1+ | ✅ Implementado localmente | HMAC com timestamp e tolerância; idempotência absorve retransmissões | canonical-meta.test.ts |  |  |
 | R40-11 | Rate limits, anti-flood e defesa contra eventos sintéticos. | E1+ | ✅ Implementado localmente | Rate limits, janela de horário dos eventos, limites de lote | tracking-attribution.test.ts |  |  |
-| R40-12 | SSRF, CSV injection e uploads maliciosos. | E1+ | 🟡 Parcial | CSV injection neutralizado; SSRF/upload pendentes (webhooks de saída ainda não existem) | webhook-pipeline.test.ts (T66) |  |  |
+| R40-12 | SSRF, CSV injection e uploads maliciosos. | E1+ | ✅ Implementado localmente | CSV injection neutralizado; SSRF em webhooks de saída (safeRequest); upload de arquivos ainda inexistente | webhook-pipeline.test.ts (T66); outbound.test.ts (T67) |  |  |
 | R40-13 | Logs redigidos, retenção limitada e auditoria de acesso a dados sensíveis. | E1+ | 🟡 Parcial | Logs com redação; auditoria de PII revelada | — |  |  |
 | R40-14 | Separação de ambientes e credenciais de teste/produção. | E1+ | 🟡 Parcial | Bancos e credenciais separados por ambiente local/teste/E2E | — |  |  |
-| R40-15 | Revogação, exclusão de credenciais, expiração de links e política de incidentes. | E1+ | 🟡 Parcial | Revogação de endpoints/credenciais/convites/sessões | auth-isolation.test.ts |  |  |
+| R40-15 | Revogação, exclusão de credenciais, expiração de links e política de incidentes. | E1+ | 🟡 Parcial | Revogação de endpoints/credenciais/convites/sessões/chaves de API/segredos de webhooks de saída | auth-isolation.test.ts; public-api.test.ts; webhooks-out.test.ts |  |  |
 | R40-16 | Dependências atualizadas, scan de segredos e tratamento de vulnerabilidades. | E1+ | 🟡 Parcial | Versões atuais fixadas; scan de segredos/vulnerabilidades pendente |  |  |  |
 | R40-17 | Privacidade: inventário de dados (finalidade, origem, destinatários, retenção), consentimento/CMP, processamento do serviço vs publicidade. | E1+ | ⏳ Planejado | Inventário de dados (docs/PRIVACY_DATA_INVENTORY.md) |  |  |  |
 | R40-18 | Exportação, correção e exclusão/anonimização; exclusão de identificação vs lançamentos financeiros agregados; hash ≠ anonimização. | E1+ | ⏳ Planejado | Exportação/correção/exclusão (privacy_requests modelado) |  |  |  |

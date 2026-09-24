@@ -2,6 +2,7 @@ import { withTx, type Pool, type PoolClient } from "@tracker/db";
 import { computeAttribution } from "./handlers/attribution";
 import { fanoutDestinations, sendDelivery, type DeliveryDeps } from "./handlers/deliveries";
 import { processReceipt } from "./handlers/process-receipt";
+import { deliverWebhook, emitWebhookEvent, type OutboundDeps, type OutboundEvent } from "./handlers/webhooks-out";
 
 /**
  * Despacho de itens da outbox. A outbox é o registro durável do trabalho (R05-04): o Redis/BullMQ apenas
@@ -13,6 +14,7 @@ export interface WorkerDeps {
   pools: { system: Pool };
   tokenHmacKey: Buffer;
   delivery: DeliveryDeps;
+  outbound: OutboundDeps;
   now: () => Date;
   log: (obj: Record<string, unknown>, msg: string) => void;
 }
@@ -57,7 +59,7 @@ export async function dispatchOutboxItem(deps: WorkerDeps, orgId: string, outbox
       if (!item) return { skip: true as const };
       if (item.status === "done" || item.status === "dead") return { skip: true as const };
       const now = deps.now();
-      if (item.topic === "delivery.send") return { external: true as const, payload: item.payload };
+      if (item.topic === "delivery.send" || item.topic === "webhooks.deliver") return { external: true as const, topic: item.topic as string, payload: item.payload };
       await runInternal(c, deps, orgId, item.topic, item.payload, now);
       await c.query("update public.outbox set status = 'done', completed_at = now(), last_error = null where id = $1", [outboxId]);
       return { done: true as const };
@@ -65,7 +67,9 @@ export async function dispatchOutboxItem(deps: WorkerDeps, orgId: string, outbox
     if ("skip" in topic) return "skipped";
     if ("done" in topic) return "done";
     // Efeito externo: fora da transação do item; o próprio envio registra tentativas e reagenda.
-    await sendDelivery((fn) => withTx(pool, { organizationId: orgId }, fn), deps.delivery, orgId, topic.payload.delivery_id, deps.now());
+    const runTx = <T>(fn: (c: PoolClient) => Promise<T>) => withTx(pool, { organizationId: orgId }, fn);
+    if (topic.topic === "webhooks.deliver") await deliverWebhook(runTx, deps.outbound, orgId, topic.payload.delivery_id, deps.now());
+    else await sendDelivery(runTx, deps.delivery, orgId, topic.payload.delivery_id, deps.now());
     await withTx(pool, { organizationId: orgId }, (c) => c.query("update public.outbox set status = 'done', completed_at = now() where id = $1", [outboxId]));
     return "done";
   } catch (err) {
@@ -88,6 +92,9 @@ async function runInternal(c: PoolClient, deps: WorkerDeps, orgId: string, topic
       return;
     case "destinations.fanout":
       await fanoutDestinations(c, { environment: deps.delivery.environment }, orgId, payload.order_id!, payload.transaction_key!, now);
+      return;
+    case "webhooks.emit":
+      await emitWebhookEvent(c, orgId, payload as unknown as OutboundEvent, now);
       return;
     default:
       throw new Error(`Tópico desconhecido na outbox: ${topic}`);

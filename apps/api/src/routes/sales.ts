@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { maskEmail, maskName, maskPhone } from "@tracker/domain";
 import { inSequence, withTx } from "@tracker/db";
 import type { FastifyPluginAsync } from "fastify";
@@ -7,6 +6,7 @@ import type { AppDeps } from "../context";
 import { forbidden, notFound } from "../lib/errors";
 import { audit, jsonSafe, orgTx } from "../lib/org-tx";
 import { assertPermission, assertProjectAccess } from "../services/auth";
+import { createManualSale, manualSaleSchema } from "../services/manual-sale";
 
 /**
  * Vendas: lista paginada no servidor por cursor, detalhe com linha do tempo e evidências (R24-01, R24-02),
@@ -144,60 +144,14 @@ export const salesRoutes =
     // Venda manual/offline: confirmação manual distinta de checkout; entra pelo mesmo pipeline auditado.
     app.post("/orders/manual", async (req, reply) => {
       assertPermission(req.auth, req.org, "sales.write", { sensitive: true });
-      const body = z
-        .object({
-          project_id: z.string().uuid(),
-          external_order_id: z.string().trim().min(1).max(200),
-          amount_minor: z.number().int().positive().safe(),
-          currency: z.string().regex(/^[A-Z]{3}$/),
-          occurred_at: z.iso.datetime({ offset: true }),
-          payment_method: z.enum(["pix", "boleto", "credit_card", "debit_card", "wallet", "other", "unknown"]).default("other"),
-          reference: z.string().trim().min(1).max(300),
-          utm_source: z.string().max(200).optional(),
-          utm_medium: z.string().max(200).optional(),
-          utm_campaign: z.string().max(200).optional(),
-        })
-        .parse(req.body);
-      assertProjectAccess(req.org!, body.project_id);
+      const sale = manualSaleSchema.parse(req.body);
+      assertProjectAccess(req.org!, sale.project_id);
       const auth = req.auth!;
       const org = req.org!;
-      const eventId = randomUUID();
-      const canonical = {
-        schema_version: "1.0",
-        source: { provider: "manual", event_id: eventId, event_type: "manual.confirmed" },
-        event_type: "payment.approved",
-        occurred_at: body.occurred_at,
-        order: { external_order_id: body.external_order_id, external_transaction_id: `manual:${body.external_order_id}`, currency: body.currency, amount_minor: body.amount_minor, payment_method: body.payment_method, transaction_kind: "manual" },
-        attribution: { utm_source: body.utm_source ?? null, utm_medium: body.utm_medium ?? null, utm_campaign: body.utm_campaign ?? null },
-      };
-      const receiptId = await withTx(deps.pools.system, { organizationId: org.id }, async (c) => {
-        const acct = await c.query(
-          `insert into public.provider_accounts (organization_id, project_id, provider, external_account_id, display_name) values ($1, $2, 'manual', $3, 'Vendas manuais')
-           on conflict (organization_id, provider, external_account_id) do update set display_name = excluded.display_name returning id`,
-          [org.id, body.project_id, `manual:${body.project_id}`],
-        );
-        let conn = (await c.query("select id from public.provider_connections where organization_id = $1 and provider_account_id = $2 and provider = 'manual'", [org.id, acct.rows[0].id])).rows[0];
-        if (!conn) {
-          conn = (
-            await c.query(
-              "insert into public.provider_connections (organization_id, project_id, provider_account_id, provider, kind, name, status) values ($1, $2, $3, 'manual', 'custom', 'Vendas manuais', 'connected') returning id",
-              [org.id, body.project_id, acct.rows[0].id],
-            )
-          ).rows[0];
-        }
-        const raw = Buffer.from(JSON.stringify(canonical));
-        const r = await c.query(
-          `insert into public.webhook_receipts (organization_id, project_id, connection_id, provider, provider_account_id, dedup_key, dedup_method, source_event_type, body, body_sha256, content_type, headers, auth_method, is_demo)
-           values ($1, $2, $3, 'manual', $4, $5, 'provider_event_id', 'manual.confirmed', $6, sha256($6), 'application/json', $7, $8, $9)
-           on conflict (organization_id, provider_account_id, dedup_key) do nothing returning id`,
-          [org.id, body.project_id, conn.id, acct.rows[0].id, `order:${body.external_order_id}`, raw, JSON.stringify({ reference: body.reference }), `user:${auth.userId}`, org.isDemo],
-        );
-        if (!r.rows[0]) return null;
-        await c.query("insert into public.outbox (organization_id, topic, payload, dedup_key, priority) values ($1, 'receipt.process', $2, $3, 1)", [org.id, JSON.stringify({ receipt_id: r.rows[0].id }), `receipt:${r.rows[0].id}`]);
-        await audit(c, { organizationId: org.id, actorId: auth.userId, action: "order.manual_created", targetType: "receipt", targetId: r.rows[0].id, details: { external_order_id: body.external_order_id, amount_minor: body.amount_minor, currency: body.currency, reference: body.reference }, requestId: req.id });
-        return r.rows[0].id as string;
-      });
-      if (!receiptId) return reply.status(409).send({ error: { code: "duplicate", message: "Já existe venda manual com este identificador", request_id: req.id } });
-      return reply.status(202).send({ receipt_id: receiptId, status: "queued" });
+      const res = await withTx(deps.pools.system, { organizationId: org.id }, (c) =>
+        createManualSale(c, { organizationId: org.id, sale, actor: { type: "user", id: auth.userId }, isDemo: org.isDemo, isTest: false, requestId: req.id }),
+      );
+      if ("duplicate" in res) return reply.status(409).send({ error: { code: "duplicate", message: "Já existe venda manual com este identificador", request_id: req.id } });
+      return reply.status(202).send({ receipt_id: res.receiptId, status: "queued" });
     });
   };
