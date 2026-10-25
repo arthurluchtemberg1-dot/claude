@@ -16,11 +16,11 @@ const { positionals, values } = parseArgs({
   options: { email: { type: "string" }, name: { type: "string" } },
 });
 const cmd = positionals[0];
-const email = values.email?.trim().toLowerCase();
 const fail = (msg: string): never => {
   console.error(msg);
   process.exit(1);
 };
+const email = values.email?.trim().toLowerCase() ?? "";
 if (!cmd || !["create-owner", "reset-password", "reset-mfa"].includes(cmd)) fail("Uso: admin.js create-owner|reset-password|reset-mfa --email voce@exemplo.com [--name \"Nome\"]");
 if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fail("Informe --email válido");
 const url = process.env.DATABASE_URL_SYSTEM ?? fail("DATABASE_URL_SYSTEM ausente");
