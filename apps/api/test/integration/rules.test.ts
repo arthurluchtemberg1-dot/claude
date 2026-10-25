@@ -92,7 +92,7 @@ describe("regras: definição, simulação e ativação (R26-01, R26-04, R26-12,
     const preset = cat.presets.find((p: { key: string }) => p.key === "spend_without_sales");
     expect(preset.name).toMatch(/^Exemplo:/);
     expect(preset.definition.condition.items[0].value).toBe("");
-    expect(cat.actions.find((a: { type: string }) => a.type === "pause")).toMatchObject({ availability: "planned", unavailable_reason: expect.stringMatching(/DEP-META-APP/) });
+    expect(cat.actions.find((a: { type: string }) => a.type === "pause")).toMatchObject({ availability: "simulation_only", unavailable_reason: expect.stringMatching(/Meta não conectada/) });
     const bad = await c.req("POST", "/v1/rules", { name: "x", definition: preset.definition });
     expect(bad.statusCode).toBe(400);
     expect(c.json(bad).error.message).toMatch(/Preencha o valor de "Investimento"/);
@@ -115,7 +115,7 @@ describe("regras: definição, simulação e ativação (R26-01, R26-04, R26-12,
     expect((await h.admin.query("select count(*)::int as n from public.notifications where organization_id = $1 and kind = 'rule.triggered'", [orgId])).rows[0].n).toBe(0);
   });
 
-  it("ativação exige simulação da versão atual; ações de mídia não ativam (capacidade indisponível)", async () => {
+  it("ativação exige simulação da versão atual; ações de mídia só ativam com a gestão Meta liberada", async () => {
     const id = await create("Sem simular", definition());
     const a = await c.req("POST", `/v1/rules/${id}/activate`);
     expect(a.statusCode).toBe(409);
@@ -124,7 +124,7 @@ describe("regras: definição, simulação e ativação (R26-01, R26-04, R26-12,
     await c.req("POST", `/v1/rules/${media}/simulate`, {});
     const m = await c.req("POST", `/v1/rules/${media}/activate`);
     expect(m.statusCode).toBe(409);
-    expect(c.json(m).error.message).toMatch(/DEP-META-APP/);
+    expect(c.json(m).error.message).toMatch(/não estão liberadas: Meta não conectada/);
   });
 });
 

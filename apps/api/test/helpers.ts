@@ -98,8 +98,13 @@ export async function createHarness(overrides: Partial<Record<string, string>> =
       },
       appUrl: "http://localhost:3000",
     },
-    rules: { systemKillSwitch: false },
+    rules: { systemKillSwitch: false, allowExternal: config.ALLOW_EXTERNAL_DELIVERY },
     ai: { getProvider: async () => (aiHandler ? { provider: fakeAi } : { unavailable: "Nenhum provedor de IA configurado" }) },
+    // Graph API falsa local quando o teste define META_GRAPH_BASE_URL (nunca a Meta real).
+    meta: {
+      loadToken: (c, orgId, connectionId) => (async () => (await import("@tracker/worker")).createSecretLoader(process.env.CREDENTIALS_KEYS)(c, orgId, connectionId, "oauth_access_token"))(),
+      graph: { version: config.META_GRAPH_API_VERSION, baseUrl: config.META_GRAPH_BASE_URL ?? "http://127.0.0.1:9", appSecret: null, timeoutMs: 1500 },
+    },
   };
   return {
     app,

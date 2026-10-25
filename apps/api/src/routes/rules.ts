@@ -1,4 +1,4 @@
-import { evaluateRule, type RuleEvaluation } from "@tracker/analytics";
+import { evaluateRule, mediaWritesState, type RuleEvaluation } from "@tracker/analytics";
 import {
   DECISION_LABEL,
   MEDIA_ACTIONS,
@@ -26,7 +26,7 @@ import { assertPermission, assertProjectAccess } from "../services/auth";
 
 /**
  * Regras e automações (R26, R23-11). Criar/editar/simular exige `rules.activate`; ativar também exige MFA nos perfis
- * sensíveis e, para ações de mídia, `media.execute` — que hoje ficam indisponíveis (sem conector de gestão).
+ * sensíveis e, para ações de mídia, `media.execute` e a gestão Meta liberada (`mediaWritesState`).
  * Ativação só depois de uma simulação da versão atual nas últimas 24 h (R26-12).
  */
 
@@ -68,6 +68,7 @@ export const ruleDefinitionSchema = z
         min_impressions: decimal.nullable().default(null),
         min_age_days: z.number().int().min(0).max(60).default(3),
         require_fresh_spend: z.boolean().default(true),
+        exclude_learning: z.boolean().default(true),
       })
       .strict(),
     condition: z.object({ op: z.enum(["and", "or"]), items: z.array(condition).min(1).max(10) }).strict(),
@@ -132,13 +133,15 @@ export const ruleRoutes =
     app.get("/rules/catalog", async (req) => {
       assertPermission(req.auth, req.org, "metrics.read");
       const cur = req.org!.currency;
+      const writes = await orgTx(deps, req, (c, { org }) => mediaWritesState(c, org.id, deps.config.ALLOW_EXTERNAL_DELIVERY));
       return {
         metrics: Object.entries(RULE_METRICS).map(([key, m]) => ({ key, ...m })),
         actions: RULE_ACTIONS.map((t) => ({
           type: t,
           label: { notify: "Notificar", webhook: "Chamar webhook", tag: "Adicionar tag interna", pause: "Pausar na rede", activate: "Ativar na rede", budget: "Ajustar orçamento", duplicate: "Duplicar" }[t],
-          availability: MEDIA_ACTIONS.has(t) ? "planned" : "active",
-          unavailable_reason: MEDIA_ACTIONS.has(t) ? "Gestão de campanhas pela API da rede depende do app Meta aprovado (DEP-META-APP); só simulação" : null,
+          // Ações na Meta: disponíveis quando a conexão permitir; senão a regra só simula, com o motivo.
+          availability: MEDIA_ACTIONS.has(t) && !writes.enabled ? "simulation_only" : "active",
+          unavailable_reason: MEDIA_ACTIONS.has(t) && !writes.enabled ? `Só simulação: ${writes.reasons.join("; ")}` : null,
         })),
         periods: RULE_PERIODS.map((p) => ({ key: p, label: RULE_PERIOD_LABEL[p] })),
         schedules: RULE_SCHEDULES,
@@ -310,7 +313,8 @@ export const ruleRoutes =
         const media = def.actions.filter((a) => MEDIA_ACTIONS.has(a.type)).map((a) => a.type);
         if (media.length) {
           if (!org.permissions.has("media.execute")) throw badRequest("permission_denied", "Ações de mídia exigem a permissão media.execute");
-          throw conflict("capability_unavailable", `Ações ${media.join(", ")} dependem da gestão de campanhas pela API da rede (DEP-META-APP). Remova-as para ativar ou mantenha a regra em simulação.`);
+          const writes = await mediaWritesState(c, org.id, deps.config.ALLOW_EXTERNAL_DELIVERY);
+          if (!writes.enabled) throw conflict("capability_unavailable", `Ações ${media.join(", ")} na Meta não estão liberadas: ${writes.reasons.join("; ")}. Remova-as para ativar ou mantenha a regra em simulação.`);
         }
         const sim = (await c.query("select 1 from public.rule_runs where rule_id = $1 and version = $2 and trigger = 'simulation' and started_at > $3::timestamptz - interval '24 hours' limit 1", [id, r.current_version, deps.now()])).rows[0];
         if (!sim) throw conflict("simulation_required", "Simule a versão atual da regra antes de ativar (simulação nas últimas 24 h)");

@@ -1,5 +1,17 @@
 import type { PoolClient } from "@tracker/db";
+import { formatMoney } from "@tracker/domain";
 import { notify } from "./notifications";
+
+/** Status da conta de anúncios (campo account_status da Marketing API). */
+const META_ACCOUNT_STATUS: Record<number, string> = {
+  2: "desativada",
+  3: "com pagamento pendente",
+  7: "em análise de risco",
+  8: "com liquidação pendente",
+  9: "em período de carência",
+  100: "com encerramento pendente",
+  101: "encerrada",
+};
 
 /**
  * Monitores periódicos por organização (R34-02), executados pelo ciclo "monitor.tick" do agendador.
@@ -17,6 +29,10 @@ export interface AlertSettings {
   queue_delay_minutes: number;
   /** Envios de conversão rejeitados/expirados na última hora por destino (padrão 3). */
   destination_failures_per_hour: number;
+  /** Percentual restante do limite de gasto da conta de anúncios para alertar (padrão 10). */
+  spend_cap_alert_pct: number;
+  /** Intervalo da sincronização automática com a Meta, em minutos (padrão 15). */
+  meta_sync_minutes: number;
 }
 
 export const DEFAULT_ALERT_SETTINGS: AlertSettings = {
@@ -24,6 +40,8 @@ export const DEFAULT_ALERT_SETTINGS: AlertSettings = {
   connection_failures_per_hour: 3,
   queue_delay_minutes: 15,
   destination_failures_per_hour: 3,
+  spend_cap_alert_pct: 10,
+  meta_sync_minutes: 15,
 };
 
 export function alertSettings(raw: unknown): AlertSettings {
@@ -37,6 +55,8 @@ export function alertSettings(raw: unknown): AlertSettings {
     connection_failures_per_hour: pick("connection_failures_per_hour"),
     queue_delay_minutes: pick("queue_delay_minutes"),
     destination_failures_per_hour: pick("destination_failures_per_hour"),
+    spend_cap_alert_pct: pick("spend_cap_alert_pct"),
+    meta_sync_minutes: Math.max(5, pick("meta_sync_minutes")),
   };
 }
 
@@ -168,6 +188,58 @@ export async function runMonitors(c: PoolClient, orgId: string, now: Date): Prom
       }, now);
     }
   }
+  // 5) Meta: sincronização periódica e alertas das contas de anúncios.
+  const metaConns = (await c.query("select id, last_success_at from public.provider_connections where organization_id = $1 and provider = 'meta_ads' and status = 'connected'", [orgId])).rows;
+  for (const mc of metaConns) {
+    if (!mc.last_success_at || now.getTime() - new Date(mc.last_success_at).getTime() >= s.meta_sync_minutes * 60_000) {
+      await c.query("insert into public.outbox (organization_id, topic, payload, dedup_key, priority) values ($1, 'meta.sync', $2, $3, 6) on conflict do nothing", [
+        orgId, JSON.stringify({ connection_id: mc.id }), `meta-sync:${mc.id}:${Math.floor(now.getTime() / (s.meta_sync_minutes * 60_000))}`,
+      ]);
+    }
+  }
+  if (metaConns.length) {
+    const accs = (
+      await c.query(
+        `select id, name, project_id, currency, account_status, spend_cap_minor, amount_spent_minor from public.ad_accounts
+          where organization_id = $1 and network = 'meta' and sync_enabled and connection_id = any($2)`,
+        [orgId, metaConns.map((m) => m.id)],
+      )
+    ).rows;
+    for (const a of accs) {
+      const st = a.account_status === null || a.account_status === 1 ? "ok" : `status_${a.account_status}`;
+      if (await transition(c, orgId, `meta_account:${a.id}`, st, now)) {
+        alerts++;
+        await notify(c, orgId, {
+          kind: "ad_account.issue",
+          projectId: a.project_id,
+          semanticKey: `ad_account.issue:${a.id}:${stamp}`,
+          title: `Conta de anúncios ${META_ACCOUNT_STATUS[a.account_status] ?? `com status ${a.account_status}`}: ${a.name}`,
+          body: `A Meta informou o status ${a.account_status} para a conta. Verifique no Gerenciador de Anúncios (pagamento, análise ou restrição).`,
+          link: "/integracoes/meta",
+          data: { ad_account_id: a.id, account_status: a.account_status },
+        }, now);
+      }
+      if (s.spend_cap_alert_pct > 0 && a.spend_cap_minor !== null && a.amount_spent_minor !== null && BigInt(a.spend_cap_minor) > 0n) {
+        const cap = BigInt(a.spend_cap_minor);
+        const remaining = cap - BigInt(a.amount_spent_minor);
+        const low = remaining * 100n < cap * BigInt(Math.round(s.spend_cap_alert_pct));
+        if (await transition(c, orgId, `meta_cap:${a.id}`, low ? "low" : "ok", now)) {
+          alerts++;
+          const fmt = (v: bigint) => formatMoney({ amountMinor: v < 0n ? 0n : v, currency: String(a.currency).trim() });
+          await notify(c, orgId, {
+            kind: "balance.low",
+            projectId: a.project_id,
+            semanticKey: `balance.low:${a.id}:${stamp}`,
+            title: `Limite de gasto quase no fim: ${a.name}`,
+            body: `Restam ${fmt(remaining)} do limite de ${fmt(cap)}. Ao atingir o limite a Meta para de veicular os anúncios da conta.`,
+            link: "/integracoes/meta",
+            data: { ad_account_id: a.id },
+          }, now);
+        }
+      }
+    }
+  }
+
   // Retenção do Gestor IA (R27-08): conversas e auditoria expiradas são removidas.
   await c.query("delete from public.ai_tool_calls where organization_id = $1 and retention_until < $2", [orgId, now]);
   await c.query("delete from public.ai_conversations where organization_id = $1 and retention_until < $2", [orgId, now]);

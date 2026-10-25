@@ -53,3 +53,12 @@ export function roundRatioHalfEven(r: Ratio): bigint {
   const out = rem * 2n > r.den || (rem * 2n === r.den && q % 2n === 1n) ? q + 1n : q;
   return neg ? -out : out;
 }
+
+/** Decimal em texto ("2", "2.5") como fração exata. */
+export function decimalToRatio(s: string): Ratio {
+  const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(s.trim());
+  if (!m) throw new Error(`Decimal inválido: ${s}`);
+  const frac = m[3] ?? "";
+  const num = BigInt(m[2] + frac) * (m[1] ? -1n : 1n);
+  return ratio(num, 10n ** BigInt(frac.length));
+}

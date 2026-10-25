@@ -19,3 +19,4 @@ export const CHECKOUT_CONNECTORS: Readonly<Record<string, CheckoutConnector>> = 
 };
 export * from "./outbound/email";
 export * from "./outbound/web-push";
+export * from "./ads/meta-graph";

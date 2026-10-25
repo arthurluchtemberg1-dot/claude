@@ -216,7 +216,8 @@ describe("preferências, push e e-mail (R34-01, R34-04)", () => {
 
   it("catálogo de tipos indica o que está planejado e o que o perfil não recebe", async () => {
     const p = c(await viewer.req("GET", "/v1/notifications/preferences"));
-    expect(p.kinds.find((k: { kind: string }) => k.kind === "balance.low")).toMatchObject({ availability: "planned", unavailable_reason: expect.stringMatching(/DEP-META-APP/) });
+    expect(p.kinds.find((k: { kind: string }) => k.kind === "billing.notice")).toMatchObject({ availability: "planned", unavailable_reason: expect.stringMatching(/DEP-BILLING/) });
+    expect(p.kinds.find((k: { kind: string }) => k.kind === "balance.low")).toMatchObject({ availability: "active" });
     expect(p.kinds.find((k: { kind: string }) => k.kind === "connection.stale")).toMatchObject({ permitted: false });
     expect(p.kinds.find((k: { kind: string }) => k.kind === "sale.approved")).toMatchObject({ permitted: true });
   });

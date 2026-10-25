@@ -73,6 +73,7 @@ const deps: WorkerDeps = {
   notifications: { allowExternal: false, email: null, push: null, appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000" },
   rules: { systemKillSwitch: true },
   ai: { getProvider: async () => ({ unavailable: "Demonstração não usa IA" }) },
+  meta: { loadToken: async () => null, graph: { version: "v26.0" } },
 };
 const processed = await drainOutbox(deps, { maxRounds: 50 });
 console.log(`Organização de demonstração criada (${orgId}); ${processed} itens processados. Selecione-a no painel.`);

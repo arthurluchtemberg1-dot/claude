@@ -1,4 +1,4 @@
-import { evaluateRule, type EvaluatedEntity } from "@tracker/analytics";
+import { evaluateRule, mediaWritesState, planMediaChange, type EvaluatedEntity } from "@tracker/analytics";
 import type { PoolClient } from "@tracker/db";
 import { DECISION_LABEL, MEDIA_ACTIONS, inQuietHours, isRole, roleHas, type RuleAction, type RuleDefinition } from "@tracker/domain";
 import { OUTBOUND_API_VERSION } from "./webhooks-out";
@@ -17,10 +17,12 @@ import { notify } from "./notifications";
 export interface RuleRunDeps {
   /** RULES_KILL_SWITCH=true: nenhuma regra executa ações (simulações continuam). */
   systemKillSwitch: boolean;
+  /** Envio externo habilitado (ALLOW_EXTERNAL_DELIVERY): exigido para ações na Meta. */
+  allowExternal?: boolean;
   maxConsecutiveFailures?: number;
 }
 
-const MEDIA_UNAVAILABLE = "Gestão de campanhas pela API da rede ainda não disponível (DEP-META-APP); ação não executada";
+const MEDIA_UNAVAILABLE = "Ação na Meta não executada";
 
 /** Enfileira as regras vencidas da organização (chamado no ciclo do agendador). */
 export async function scheduleDueRules(c: PoolClient, orgId: string, now: Date): Promise<number> {
@@ -94,7 +96,7 @@ export async function runRuleJob(c: PoolClient, deps: RuleRunDeps, orgId: string
 
   let failures = 0;
   for (const e of ev.entities) {
-    const results = e.decision.kind === "execute" ? await executeActions(c, orgId, rule, def, run, e, now) : [];
+    const results = e.decision.kind === "execute" ? await executeActions(deps, c, orgId, rule, def, run, e, now) : [];
     failures += results.filter((r) => r.status === "failed").length;
     await c.query(
       `insert into public.rule_decisions (organization_id, run_id, entity_level, entity_id, entity_name, decision, explanation, metrics, evaluation, actions)
@@ -117,6 +119,7 @@ export async function runRuleJob(c: PoolClient, deps: RuleRunDeps, orgId: string
 }
 
 async function applyAction(
+  deps: RuleRunDeps,
   c: PoolClient,
   orgId: string,
   rule: { id: string; name: string; current_version: number },
@@ -126,9 +129,23 @@ async function applyAction(
   a: RuleAction,
   key: string,
   now: Date,
-): Promise<{ status: "executed" | "failed" | "skipped_capability"; detail: string }> {
+): Promise<{ status: "executed" | "failed" | "skipped_capability" | "skipped_noop"; detail: string; mediaChangeId?: string }> {
   const bucket = key.slice(key.lastIndexOf(":") + 1);
-  if (MEDIA_ACTIONS.has(a.type)) return { status: "skipped_capability", detail: MEDIA_UNAVAILABLE };
+  if (MEDIA_ACTIONS.has(a.type)) {
+    const writes = await mediaWritesState(c, orgId, deps.allowExternal ?? false);
+    if (!writes.enabled) return { status: "skipped_capability", detail: `${MEDIA_UNAVAILABLE}: ${writes.reasons.join("; ")}` };
+    if (e.level === "project" || !e.id) return { status: "failed", detail: "Ações de mídia só em campanha, conjunto ou anúncio" };
+    const r = await planMediaChange(c, orgId, writes, {
+      action: a.type as "pause" | "activate" | "budget" | "duplicate",
+      level: e.level,
+      entityId: e.id,
+      budget: a.type === "budget" ? { mode: a.mode, value: a.value, maxChangePct: def.limits.max_budget_change_pct, ceiling: def.limits.budget_ceiling } : undefined,
+      actor: { type: "rule", id: null, ruleId: rule.id },
+      idempotencyKey: `rule:${key}`,
+    });
+    if (!r.ok) return { status: r.noop ? "skipped_noop" : "failed", detail: r.error };
+    return { status: "executed", detail: `${r.summary} — enviado à Meta (acompanhe no histórico de alterações)`, mediaChangeId: r.changeId };
+  }
   if (a.type === "notify") {
     const r = await notify(c, orgId, {
       kind: "rule.triggered",
@@ -170,9 +187,9 @@ async function applyAction(
   return { status: "failed", detail: "Ação desconhecida" };
 }
 
-type ActionResult = { type: RuleAction["type"]; status: "executed" | "failed" | "skipped_capability" | "duplicate"; detail: string };
+type ActionResult = { type: RuleAction["type"]; status: "executed" | "failed" | "skipped_capability" | "skipped_noop" | "duplicate"; detail: string };
 
-async function executeActions(c: PoolClient, orgId: string, rule: { id: string; name: string; current_version: number }, def: RuleDefinition, runId: string, e: EvaluatedEntity, now: Date): Promise<ActionResult[]> {
+async function executeActions(deps: RuleRunDeps, c: PoolClient, orgId: string, rule: { id: string; name: string; current_version: number }, def: RuleDefinition, runId: string, e: EvaluatedEntity, now: Date): Promise<ActionResult[]> {
   // Janela de idempotência = intervalo mínimo: a mesma decisão repetida (retry do job) não duplica a ação.
   const bucket = Math.floor(now.getTime() / (def.limits.cooldown_minutes * 60_000));
   // Lock por entidade (R26-07): regras diferentes não agem na mesma entidade ao mesmo tempo.
@@ -191,12 +208,13 @@ async function executeActions(c: PoolClient, orgId: string, rule: { id: string; 
       out.push({ type: a.type, status: "duplicate", detail: "Já executada nesta janela (idempotência)" });
       continue;
     }
-    const r = await applyAction(c, orgId, rule, def, runId, e, a, key, now);
+    const r = await applyAction(deps, c, orgId, rule, def, runId, e, a, key, now);
     // Falha libera a chave (registro fica para auditoria): a próxima execução tenta de novo e conta para o circuit breaker.
-    await c.query("update public.rule_actions set status = $2, detail = $3, idempotency_key = case when $2 = 'failed' then idempotency_key || ':failed:' || id::text else idempotency_key end where id = $1", [
-      actionId, r.status, r.detail,
-    ]);
-    out.push({ type: a.type, ...r });
+    await c.query(
+      "update public.rule_actions set status = $2, detail = $3, media_change_id = $4, idempotency_key = case when $2 = 'failed' then idempotency_key || ':failed:' || id::text else idempotency_key end where id = $1",
+      [actionId, r.status, r.detail, r.mediaChangeId ?? null],
+    );
+    out.push({ type: a.type, status: r.status, detail: r.detail });
   }
   return out;
 }

@@ -129,7 +129,7 @@ export async function evaluateRule(c: PoolClient, input: RuleEvalInput): Promise
       : { ok: true, spend_through: through };
 
   const base = { organizationId: input.organizationId, projectIds, from: window.from, to: window.to, timezone: input.timezone, basis: "approval" as const, asOf, includeTest: false, policyKey: def.evaluation.attribution_policy };
-  const rows: Omit<EvaluatedEntity, "decision" | "metrics">[] = [];
+  const rows: (Omit<EvaluatedEntity, "decision" | "metrics"> & { learning?: boolean | null })[] = [];
   let truncated = false;
   if (def.level === "project") {
     const targets: { id: string | null; name: string; projects: string[] | null }[] = def.scope.project_ids.length
@@ -188,9 +188,23 @@ export async function evaluateRule(c: PoolClient, input: RuleEvalInput): Promise
           ).rows.map((r) => [r.id, r.first])
         : [],
     );
-    const statuses = new Map<string, string>(
-      ids.length ? (await c.query("select external_id, coalesce(effective_status, status) as s from public.ad_entities where organization_id = $1 and level = $2 and external_id = any($3) and coalesce(effective_status, status) is not null", [input.organizationId, def.level, ids])).rows.map((r) => [r.external_id, r.s]) : [],
-    );
+    // Estado na Meta (sincronização): status configurado, orçamento diário e aprendizagem (conjunto; anúncio herda do
+    // conjunto; campanha em aprendizado se algum conjunto dela estiver).
+    const ents = new Map<string, { status: string | null; budget: bigint | null; learning: boolean | null }>();
+    if (ids.length) {
+      const rowsE = (
+        await c.query(
+          `select e.external_id, e.status, e.daily_budget_minor,
+                  case when $2 = 'adset' then e.learning_status
+                       when $2 = 'ad' then (select s.learning_status from public.ad_entities s where s.organization_id = e.organization_id and s.level = 'adset' and s.external_id = e.adset_external_id limit 1)
+                       else (select case when bool_or(s.learning_status = 'LEARNING') then 'LEARNING' when count(s.learning_status) > 0 then 'SUCCESS' end
+                               from public.ad_entities s where s.organization_id = e.organization_id and s.level = 'adset' and s.campaign_external_id = e.external_id and s.status = 'ACTIVE') end as learning
+             from public.ad_entities e where e.organization_id = $1 and e.level = $2 and e.external_id = any($3)`,
+          [input.organizationId, def.level, ids],
+        )
+      ).rows;
+      for (const r of rowsE) ents.set(r.external_id, { status: r.status, budget: r.daily_budget_minor === null ? null : BigInt(r.daily_budget_minor), learning: r.learning === null ? null : r.learning === "LEARNING" });
+    }
     const today = window.to;
     for (const r of list) {
       const first = ages.get(r.id!);
@@ -203,9 +217,10 @@ export async function evaluateRule(c: PoolClient, input: RuleEvalInput): Promise
         grossMinor: r.attributed_gross_minor,
         netMinor: r.attributed_net_minor,
         ageDays,
-        status: statuses.get(r.id!) ?? null,
+        status: ents.get(r.id!)?.status ?? null,
+        dailyBudgetMinor: ents.get(r.id!)?.budget ?? null,
       });
-      rows.push({ level: def.level, id: r.id, name: r.name ?? `ID ${r.id}`, projectId: null, rawMetrics: raw });
+      rows.push({ level: def.level, id: r.id, name: r.name ?? `ID ${r.id}`, projectId: null, rawMetrics: raw, learning: ents.get(r.id!)?.learning ?? null });
     }
   }
 
@@ -223,10 +238,13 @@ export async function evaluateRule(c: PoolClient, input: RuleEvalInput): Promise
       minutesSinceLastAction: ctx.last.get(key) ?? null,
       actionsToday,
       conflictingAction: ctx.conflicts.get(key) ?? null,
+      learning: r.learning ?? null,
     });
     if (decision.kind === "execute" || decision.kind === "would_execute") actionsToday++;
     const metrics = Object.fromEntries([...used].filter((k) => r.rawMetrics[k]).map((k) => [k, formatRuleValue(k, r.rawMetrics[k], def.currency)]));
-    entities.push({ ...r, metrics, decision });
+    const { learning: _l, ...rest } = r;
+    void _l;
+    entities.push({ ...rest, metrics, decision });
   }
   return { asOf, window, freshness, entities, truncated, notes };
 }

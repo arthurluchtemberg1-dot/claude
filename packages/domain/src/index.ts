@@ -6,6 +6,7 @@ export * from "./financial/order-aggregate";
 export * from "./metrics/ratio";
 export * from "./metrics/definitions";
 export * from "./metrics/compute";
+export * from "./metrics/media-row";
 export * from "./attribution/classify";
 export * from "./attribution/engine";
 export * from "./utm/macros";

@@ -6,6 +6,8 @@ import { runMonitors } from "./handlers/monitors";
 import { deliverNotification, notify, notifySale, type NotificationDeps } from "./handlers/notifications";
 import { processReceipt } from "./handlers/process-receipt";
 import { runRuleJob, scheduleDueRules, type RuleRunDeps } from "./handlers/rules";
+import { runMetaSync, type MetaSyncDeps } from "./handlers/meta-sync";
+import { runMetaAction } from "./handlers/meta-action";
 import { deliverWebhook, emitWebhookEvent, type OutboundDeps, type OutboundEvent } from "./handlers/webhooks-out";
 
 /**
@@ -22,6 +24,7 @@ export interface WorkerDeps {
   notifications: NotificationDeps;
   rules: RuleRunDeps;
   ai: AiRunDeps;
+  meta: MetaSyncDeps;
   now: () => Date;
   log: (obj: Record<string, unknown>, msg: string) => void;
 }
@@ -66,7 +69,7 @@ export async function dispatchOutboxItem(deps: WorkerDeps, orgId: string, outbox
       if (!item) return { skip: true as const };
       if (item.status === "done" || item.status === "dead") return { skip: true as const };
       const now = deps.now();
-      if (item.topic === "delivery.send" || item.topic === "webhooks.deliver" || item.topic === "notifications.deliver" || item.topic === "ai.run") return { external: true as const, topic: item.topic as string, payload: item.payload };
+      if (item.topic === "delivery.send" || item.topic === "webhooks.deliver" || item.topic === "notifications.deliver" || item.topic === "ai.run" || item.topic === "meta.sync" || item.topic === "meta.action") return { external: true as const, topic: item.topic as string, payload: item.payload };
       await runInternal(c, deps, orgId, item.topic, item.payload, now);
       await c.query("update public.outbox set status = 'done', completed_at = now(), last_error = null where id = $1", [outboxId]);
       return { done: true as const };
@@ -78,6 +81,13 @@ export async function dispatchOutboxItem(deps: WorkerDeps, orgId: string, outbox
     if (topic.topic === "webhooks.deliver") await deliverWebhook(runTx, deps.outbound, orgId, topic.payload.delivery_id, deps.now());
     else if (topic.topic === "notifications.deliver") await deliverNotification(runTx, deps.notifications, orgId, topic.payload.delivery_id, deps.now());
     else if (topic.topic === "ai.run") await runAiQuestion(runTx, deps.ai, orgId, topic.payload.conversation_id, deps.now);
+    else if (topic.topic === "meta.action") {
+      const r = await runMetaAction(runTx, { ...deps.meta, allowExternal: deps.delivery.allowExternalDelivery }, orgId, topic.payload.change_id, deps.now());
+      deps.log({ orgId, change: topic.payload.change_id, ...r }, "meta_action");
+    } else if (topic.topic === "meta.sync") {
+      const r = await runMetaSync(runTx, deps.meta, orgId, topic.payload, deps.now());
+      deps.log({ orgId, connection: topic.payload.connection_id, ...r }, "meta_sync");
+    }
     else await sendDelivery(runTx, deps.delivery, orgId, topic.payload.delivery_id, deps.now());
     await withTx(pool, { organizationId: orgId }, (c) => c.query("update public.outbox set status = 'done', completed_at = now() where id = $1", [outboxId]));
     return "done";

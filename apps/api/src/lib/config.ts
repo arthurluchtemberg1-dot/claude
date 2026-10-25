@@ -35,7 +35,11 @@ const schema = z.object({
   EMAIL_FROM: z.string().default("Tracker <no-reply@example.com>"),
   SMTP_URL: z.string().optional(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "silent"]).default("info"),
-  META_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v24.0"),
+  META_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v26.0"),
+  // Só para testes com servidor falso; em produção a Graph API é sempre https://graph.facebook.com.
+  META_GRAPH_BASE_URL: z.string().url().optional(),
+  // Segredo do app Meta (opcional): quando definido, as chamadas levam appsecret_proof.
+  META_APP_SECRET: z.string().optional(),
   ALLOW_EXTERNAL_DELIVERY: z
     .string()
     .default("false")
@@ -85,6 +89,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (!credentialKeys.has(c.CREDENTIALS_KEY_CURRENT)) throw new Error("CREDENTIALS_KEY_CURRENT não corresponde a nenhuma chave");
   if (c.NODE_ENV === "production" && !c.SESSION_COOKIE_SECURE) throw new Error("Em produção SESSION_COOKIE_SECURE deve ser true");
   if (c.EMAIL_TRANSPORT === "smtp" && !c.SMTP_URL) throw new Error("EMAIL_TRANSPORT=smtp exige SMTP_URL");
+  if (c.META_GRAPH_BASE_URL && (c.NODE_ENV === "production" || c.APP_ENV === "production")) throw new Error("META_GRAPH_BASE_URL é só para testes");
   return {
     ...c,
     credentialKeys,

@@ -13,7 +13,7 @@ export function baseDefinition(level: RuleDefinition["level"], currency: string)
     level,
     currency,
     scope: { project_ids: [], network: null, name_contains: null, entity_ids: [] },
-    evaluation: { period: "today", attribution_policy: "default", conversion_delay_hours: 0, min_spend: null, min_orders: null, min_impressions: null, min_age_days: level === "project" ? 0 : 3, require_fresh_spend: true },
+    evaluation: { period: "today", attribution_policy: "default", conversion_delay_hours: 0, min_spend: null, min_orders: null, min_impressions: null, min_age_days: level === "project" ? 0 : 3, require_fresh_spend: true, exclude_learning: true },
     condition: { op: "and", items: [] },
     actions: [{ type: "notify" }],
     limits: { cooldown_minutes: level === "project" ? 1440 : 360, max_actions_per_day: 20, max_budget_change_pct: 20, budget_ceiling: null },

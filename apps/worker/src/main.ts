@@ -53,7 +53,11 @@ const deps: WorkerDeps = {
     push: vapid ? createPushSender(vapid, { ...outboundPolicy, requireHttps: true }, pushHostsFromEnv(process.env)) : null,
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   },
-  rules: { systemKillSwitch: process.env.RULES_KILL_SWITCH === "true" },
+  rules: { systemKillSwitch: process.env.RULES_KILL_SWITCH === "true", allowExternal: process.env.ALLOW_EXTERNAL_DELIVERY === "true" },
+  meta: {
+    loadToken: (c, orgId, connectionId) => loadSecret(c, orgId, connectionId, "oauth_access_token"),
+    graph: { version: process.env.META_GRAPH_API_VERSION ?? "v26.0", appSecret: process.env.META_APP_SECRET || null },
+  },
   ai: {
     // Chave própria da organização (cofre) tem prioridade sobre a do ambiente.
     getProvider: async (c, orgId) => {

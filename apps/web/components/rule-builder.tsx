@@ -209,7 +209,15 @@ export function RuleBuilder({ catalog, initial, initialName, onSaved, ruleId }: 
       <div className="grid gap-3 md:grid-cols-4">
         <Field label="Investimento mínimo (R$)">{(id) => <Input id={id} value={def.evaluation.min_spend ?? ""} onChange={(e) => set(["evaluation", "min_spend"], e.target.value || null)} />}</Field>
         <Field label="Vendas mínimas">{(id) => <Input id={id} value={def.evaluation.min_orders ?? ""} onChange={(e) => set(["evaluation", "min_orders"], e.target.value || null)} />}</Field>
-        <Field label="Idade mínima (dias)" hint="Aproximação de aprendizagem enquanto a rede não informa o status">
+        <Field label="Fase de aprendizado">
+          {(id) => (
+            <Select id={id} value={def.evaluation.exclude_learning === false ? "include" : "exclude"} onChange={(e) => set(["evaluation", "exclude_learning"], e.target.value === "exclude")}>
+              <option value="exclude">Não agir em aprendizado</option>
+              <option value="include">Agir mesmo em aprendizado</option>
+            </Select>
+          )}
+        </Field>
+        <Field label="Idade mínima (dias)" hint="Usada quando a Meta não informa a fase de aprendizado">
           {(id) => <Input id={id} type="number" min={0} max={60} value={def.evaluation.min_age_days} onChange={(e) => set(["evaluation", "min_age_days"], Number(e.target.value))} />}
         </Field>
         <Field label="Atraso de conversão (h)" hint="Ignora as últimas horas, em que vendas ainda podem chegar">
@@ -232,7 +240,8 @@ export function RuleBuilder({ catalog, initial, initialName, onSaved, ruleId }: 
       <h3 className="mt-4 text-sm font-semibold">Ações</h3>
       <div className="space-y-2">
         {catalog.actions.map((a) => {
-          const disabled = a.availability !== "active" || (def.level === "project" && !["notify", "webhook"].includes(a.type));
+          // Ações "só simulação" continuam selecionáveis (a simulação mostra o efeito); o servidor bloqueia a ativação.
+          const disabled = a.availability === "planned" || (def.level === "project" && !["notify", "webhook"].includes(a.type)) || (a.type === "budget" && def.level === "ad");
           return (
             <div key={a.type} className="flex flex-wrap items-center gap-2 text-sm">
               <label className="flex items-center gap-2">
@@ -241,11 +250,32 @@ export function RuleBuilder({ catalog, initial, initialName, onSaved, ruleId }: 
                   aria-label={a.label}
                   disabled={disabled && !hasAction(a.type)}
                   checked={hasAction(a.type)}
-                  onChange={(e) => toggleAction(a.type, e.target.checked, a.type === "tag" ? { tag: "regra" } : a.type === "webhook" ? { subscription_id: subs.data?.subscriptions.find((s) => s.events.includes("rule.triggered"))?.id ?? "" } : {})}
+                  onChange={(e) =>
+                    toggleAction(
+                      a.type,
+                      e.target.checked,
+                      a.type === "tag" ? { tag: "regra" } : a.type === "webhook" ? { subscription_id: subs.data?.subscriptions.find((s) => s.events.includes("rule.triggered"))?.id ?? "" } : a.type === "budget" ? { mode: "percent", value: "-20" } : {},
+                    )
+                  }
                 />
                 {a.label}
               </label>
-              {a.unavailable_reason && <Badge tone="neutral" title={a.unavailable_reason}>só simulação</Badge>}
+              {a.unavailable_reason && (
+                <Badge tone="neutral" title={a.unavailable_reason}>
+                  só simulação
+                </Badge>
+              )}
+              {a.unavailable_reason && hasAction(a.type) && <span className="text-xs text-muted">{a.unavailable_reason}</span>}
+              {a.type === "budget" && hasAction("budget") && (
+                <>
+                  <Select aria-label="Tipo de ajuste" className="w-auto" value={def.actions.find((x: any) => x.type === "budget").mode} onChange={(e) => set(["actions"], def.actions.map((x: any) => (x.type === "budget" ? { ...x, mode: e.target.value } : x)))}>
+                    <option value="percent">variar em %</option>
+                    <option value="absolute">definir valor (R$)</option>
+                  </Select>
+                  <Input aria-label="Valor do ajuste" className="w-28" value={def.actions.find((x: any) => x.type === "budget").value} onChange={(e) => set(["actions"], def.actions.map((x: any) => (x.type === "budget" ? { ...x, value: e.target.value } : x)))} />
+                  <span className="text-xs text-muted">ex.: -20 reduz 20%; 15 aumenta 15%</span>
+                </>
+              )}
               {a.type === "tag" && hasAction("tag") && (
                 <Input aria-label="Tag" className="w-40" value={def.actions.find((x: any) => x.type === "tag").tag} onChange={(e) => set(["actions"], def.actions.map((x: any) => (x.type === "tag" ? { ...x, tag: e.target.value } : x)))} />
               )}
@@ -270,6 +300,16 @@ export function RuleBuilder({ catalog, initial, initialName, onSaved, ruleId }: 
       <div className="grid gap-3 md:grid-cols-4">
         <Field label="Intervalo mínimo entre ações (min)">{(id) => <Input id={id} type="number" min={15} value={def.limits.cooldown_minutes} onChange={(e) => set(["limits", "cooldown_minutes"], Number(e.target.value))} />}</Field>
         <Field label="Máximo de ações por dia">{(id) => <Input id={id} type="number" min={1} max={500} value={def.limits.max_actions_per_day} onChange={(e) => set(["limits", "max_actions_per_day"], Number(e.target.value))} />}</Field>
+        {hasAction("budget") && (
+          <>
+            <Field label="Variação máxima por ação (%)">
+              {(id) => <Input id={id} type="number" min={1} max={100} value={def.limits.max_budget_change_pct ?? ""} onChange={(e) => set(["limits", "max_budget_change_pct"], e.target.value === "" ? null : Number(e.target.value))} />}
+            </Field>
+            <Field label="Teto de orçamento diário (R$)" hint="Vazio = sem teto">
+              {(id) => <Input id={id} value={def.limits.budget_ceiling ?? ""} onChange={(e) => set(["limits", "budget_ceiling"], e.target.value || null)} />}
+            </Field>
+          </>
+        )}
         <Field label="Avaliar a cada">
           {(id) => (
             <Select id={id} value={def.schedule.every_minutes} onChange={(e) => set(["schedule", "every_minutes"], Number(e.target.value))}>

@@ -9,3 +9,5 @@ export * from "./handlers/notifications";
 export * from "./handlers/monitors";
 export * from "./scheduler";
 export * from "./handlers/rules";
+export * from "./handlers/meta-sync";
+export * from "./handlers/meta-action";

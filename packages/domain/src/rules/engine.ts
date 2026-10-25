@@ -46,9 +46,10 @@ export const RULE_METRICS = {
   cpc: { label: "CPC de link", unit: "money", levels: ALL, description: "Investimento ÷ cliques no link.", availability: "active" },
   cpm: { label: "CPM", unit: "money", levels: ALL, description: "Investimento ÷ impressões × 1.000.", availability: "active" },
   age_days: { label: "Dias desde o primeiro gasto", unit: "days", levels: ENTITY, description: "Idade observada pela primeira data de gasto importado.", availability: "active" },
-  status: { label: "Status na rede", unit: "status", levels: ENTITY, description: "Status configurado na rede (ex.: ACTIVE, PAUSED).", availability: "planned", unavailableReason: "Depende da sincronização de entidades Meta (DEP-META-APP)" },
-  frequency: { label: "Frequência", unit: "ratio", levels: ENTITY, description: "Impressões ÷ alcance.", availability: "planned", unavailableReason: "Alcance não é importado; depende da sincronização Meta (DEP-META-APP)" },
-  budget_change_pct: { label: "Variação de orçamento (%)", unit: "percent", levels: ENTITY, description: "Mudança de orçamento no período.", availability: "planned", unavailableReason: "Orçamento só com conexão de gestão Meta (DEP-META-APP)" },
+  status: { label: "Status na rede", unit: "status", levels: ENTITY, description: "Status configurado na Meta (ACTIVE, PAUSED), lido na sincronização.", availability: "active" },
+  daily_budget: { label: "Orçamento diário", unit: "money", levels: ["campaign", "adset"], description: "Orçamento diário atual na Meta (só no nível em que está definido).", availability: "active" },
+  frequency: { label: "Frequência", unit: "ratio", levels: ENTITY, description: "Impressões ÷ alcance do período.", availability: "planned", unavailableReason: "O alcance de um período não é a soma do alcance diário; leitura por período ainda não implementada" },
+  budget_change_pct: { label: "Variação de orçamento (%)", unit: "percent", levels: ENTITY, description: "Mudança de orçamento no período.", availability: "planned", unavailableReason: "Histórico de orçamento ainda não comparado entre sincronizações" },
   balance: { label: "Saldo da conta", unit: "money", levels: ENTITY, description: "Saldo disponível quando a rede expõe o campo.", availability: "planned", unavailableReason: "Depende da sincronização de contas Meta (DEP-META-APP); ausência nunca vira saldo zero" },
 } as const satisfies Record<string, RuleMetricDef>;
 
@@ -103,6 +104,8 @@ export interface RuleDefinition {
     min_age_days: number;
     /** Gasto deve estar importado/sincronizado até o fim da janela (R26-09). */
     require_fresh_spend: boolean;
+    /** Não agir em entidades em fase de aprendizado na Meta (R26-10). Padrão: sim. */
+    exclude_learning?: boolean;
   };
   condition: RuleConditionGroup;
   actions: RuleAction[];
@@ -134,6 +137,7 @@ export function entityRuleMetrics(row: {
   netMinor: bigint;
   ageDays: number | null;
   status: string | null;
+  dailyBudgetMinor?: bigint | null;
 }): Record<RuleMetricKey, RuleMetricValue> {
   const noSpend = "Sem gasto importado/sincronizado para esta entidade no período";
   const s = row.spendMinor;
@@ -152,7 +156,8 @@ export function entityRuleMetrics(row: {
     cpc: s === null || row.linkClicks === null ? { status: "unavailable", reason: "Gasto/cliques não importados" } : row.linkClicks === 0n ? { status: "undefined", reason: "Sem cliques" } : { status: "ok", value: ratio(s, row.linkClicks) },
     cpm: s === null || row.impressions === null ? { status: "unavailable", reason: "Gasto/impressões não importados" } : row.impressions === 0n ? { status: "undefined", reason: "Sem impressões" } : { status: "ok", value: ratio(s * 1000n, row.impressions) },
     age_days: row.ageDays === null ? { status: "unavailable", reason: "Sem histórico de gasto para estimar a idade" } : { status: "ok", value: ratio(BigInt(row.ageDays), 1n) },
-    status: row.status ? { status: "ok", value: ratio(0n, 1n), text: row.status } : planned("status"),
+    status: row.status ? { status: "ok", value: ratio(0n, 1n), text: row.status } : { status: "unavailable", reason: "Status não sincronizado (conecte a Meta ou importe as entidades)" },
+    daily_budget: row.dailyBudgetMinor === undefined || row.dailyBudgetMinor === null ? { status: "unavailable", reason: "Orçamento diário não definido neste nível (ou não sincronizado)" } : moneyValue(row.dailyBudgetMinor),
     frequency: planned("frequency"),
     budget_change_pct: planned("budget_change_pct"),
     balance: planned("balance"),
@@ -247,7 +252,7 @@ export const DECISION_LABEL: Record<RuleDecisionKind, string> = {
   would_execute: "Executaria (simulação)",
   no_match: "Condições não atendidas",
   skip_stale: "Não executada: dados atrasados",
-  skip_learning: "Não executada: entidade nova (observação)",
+  skip_learning: "Não executada: em aprendizado ou entidade nova",
   skip_sample: "Não executada: amostra insuficiente",
   skip_missing_data: "Não executada: dados ausentes",
   skip_cooldown: "Não executada: em intervalo mínimo (cooldown)",
@@ -263,6 +268,8 @@ export interface DecisionContext {
   actionsToday: number;
   /** Ação oposta recente de outra regra na mesma entidade (ex.: pausou e esta quer ativar). */
   conflictingAction: string | null;
+  /** Em aprendizado segundo a Meta (true/false) ou desconhecido (null → usa a idade como aproximação). */
+  learning?: boolean | null;
 }
 
 export interface RuleDecision {
@@ -277,7 +284,10 @@ export function decideEntity(def: RuleDefinition, metrics: Record<RuleMetricKey,
   const mk = (kind: RuleDecisionKind, why: string): RuleDecision => ({ kind, evaluation: ev, explanation: `${DECISION_LABEL[kind]}. ${why}` });
   const usesSpend = JSON.stringify(def.condition).match(/"metric":"(spend|cpa|roas|cpc|cpm|contribution)"/) !== null;
   if (usesSpend && def.evaluation.require_fresh_spend && !ctx.freshness.ok) return mk("skip_stale", ctx.freshness.reason);
-  if (def.level !== "project" && def.evaluation.min_age_days > 0) {
+  if (def.level !== "project" && (def.evaluation.exclude_learning ?? true) && ctx.learning === true) {
+    return mk("skip_learning", "Em fase de aprendizado na Meta: mudanças agora reiniciam o aprendizado. Desmarque \"não agir em aprendizado\" para incluir.");
+  }
+  if (def.level !== "project" && def.evaluation.min_age_days > 0 && (ctx.learning === null || ctx.learning === undefined)) {
     const age = metrics.age_days;
     if (age.status === "ok" && cmp(age.value, ratio(BigInt(def.evaluation.min_age_days), 1n)) < 0) {
       return mk("skip_learning", `Primeiro gasto há ${formatRuleValue("age_days", age, def.currency)} dia(s); mínimo configurado ${def.evaluation.min_age_days}. O status de aprendizagem da rede não está disponível, por isso a idade é usada como aproximação.`);
