@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { DECISION_TONE, LEVEL_LABEL, RULE_STATUS as STATUS, RuleBuilder, SimulationResult, type Catalog } from "@/components/rule-builder";
@@ -50,14 +51,24 @@ export default function RulePage() {
   const { id } = useParams<{ id: string }>();
   const { can, org } = useSession();
   const tz = org.organization.timezone;
-  const rule = useApi<{ rule: any; definition: any; versions: any[]; last_simulation: any }>(`/v1/rules/${id}`);
-  const runs = useApi<{ runs: any[]; actions: any[] }>(`/v1/rules/${id}/runs`);
+  // Endereço com ID inválido (link antigo ou digitado): não consulta a API.
+  const valid = /^[0-9a-f-]{36}$/i.test(id ?? "");
+  const rule = useApi<{ rule: any; definition: any; versions: any[]; last_simulation: any }>(valid ? `/v1/rules/${id}` : null);
+  const runs = useApi<{ runs: any[]; actions: any[] }>(valid ? `/v1/rules/${id}/runs` : null);
   const catalog = useApi<Catalog>("/v1/rules/catalog");
   const [open, setOpen] = useState<string | null>(null);
   const [edit, setEdit] = useState(false);
   const [sim, setSim] = useState<any[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  if (!valid || rule.error?.status === 404)
+    return (
+      <Alert tone="warn" title="Regra não encontrada">
+        <Link className="underline" href="/automacao">
+          Voltar às regras
+        </Link>
+      </Alert>
+    );
   if (rule.error) return <ErrorBox error={rule.error} onRetry={rule.reload} />;
   if (!rule.data) return null;
   const r = rule.data.rule;

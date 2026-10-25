@@ -77,7 +77,7 @@ export default function AutomationPage() {
     <div className="space-y-4">
       <PageHeader
         title="Automação"
-        description="Regras que avaliam campanhas, conjuntos, anúncios ou metas do projeto e notificam, marcam ou chamam webhooks. Toda regra é simulada antes de ativar; ações na rede de anúncios ficam em simulação até a conexão de gestão Meta."
+        description="Regras que avaliam campanhas, conjuntos, anúncios ou metas do projeto e notificam, pausam, ajustam orçamento, marcam ou chamam webhooks. Toda regra é simulada antes de ativar; ações na Meta (pausar, ativar, orçamento, duplicar) executam quando a gestão estiver liberada em Meta Ads; até lá, só simulam."
       />
       <KillSwitch />
       {err && <Alert tone="err">{err}</Alert>}

@@ -72,9 +72,41 @@ export const RULE_PRESETS: RulePreset[] = [
   {
     key: "pause_ad_without_sales",
     name: "Exemplo: pausar anúncio sem vendas",
-    description: "Pausaria o anúncio que passar do gasto definido sem vendas. Depende da conexão de gestão Meta; até lá só simula.",
+    description: "Pausa na Meta o anúncio que passar do gasto definido sem vendas aprovadas. Só executa com as ações de gestão liberadas em Meta Ads; até lá, simula.",
     required: ["Investimento a partir do qual pausar"],
     definition: (cur) => ({ ...baseDefinition("ad", cur), actions: [{ type: "notify" }, { type: "pause" }], condition: { op: "and", items: [cond("spend", "gte"), cond("approved_orders", "eq", "0")] } }),
+  },
+  {
+    key: "scale_adset_roas",
+    name: "Exemplo: aumentar orçamento de conjunto com ROAS alto",
+    description: "Sobe o orçamento diário do conjunto em 20% quando o ROAS dos últimos 3 dias passa do seu mínimo, com gasto mínimo para avaliar. Fora da fase de aprendizado, no máximo 1 vez por dia.",
+    required: ["ROAS mínimo para escalar", "Investimento mínimo para avaliar"],
+    definition: (cur) => {
+      const b = baseDefinition("adset", cur);
+      return {
+        ...b,
+        evaluation: { ...b.evaluation, period: "last_3d", min_spend: "" },
+        condition: { op: "and", items: [cond("roas", "gte")] },
+        actions: [{ type: "notify" }, { type: "budget", mode: "percent", value: "20" }],
+        limits: { ...b.limits, cooldown_minutes: 1440, max_budget_change_pct: 20 },
+      };
+    },
+  },
+  {
+    key: "reduce_adset_cpa",
+    name: "Exemplo: reduzir orçamento de conjunto com CPA alto",
+    description: "Reduz o orçamento diário do conjunto em 20% quando o CPA dos últimos 3 dias passa do seu limite (com ao menos uma venda). Fora da fase de aprendizado.",
+    required: ["CPA máximo"],
+    definition: (cur) => {
+      const b = baseDefinition("adset", cur);
+      return {
+        ...b,
+        evaluation: { ...b.evaluation, period: "last_3d", min_orders: "1" },
+        condition: { op: "and", items: [cond("cpa", "gt")] },
+        actions: [{ type: "notify" }, { type: "budget", mode: "percent", value: "-20" }],
+        limits: { ...b.limits, cooldown_minutes: 1440, max_budget_change_pct: 20 },
+      };
+    },
   },
 ];
 

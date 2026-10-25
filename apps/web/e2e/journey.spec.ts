@@ -71,7 +71,8 @@ test("T70 jornada completa: cadastro → conexão Lowify → visita com SDK → 
   await page.goto("/onboarding");
   await page.getByLabel("Nome da organização").fill("Operação E2E");
   await page.getByRole("button", { name: "Criar e continuar" }).click();
-  await expect(page).toHaveURL(/\/integracoes/);
+  await expect(page).toHaveURL(/\/primeiros-passos/);
+  await expect(page.getByRole("heading", { level: 1, name: "Primeiros passos" })).toBeVisible();
   await page.goto("/painel");
   await expect(page.getByRole("heading", { name: "Visão geral" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Receita bruta aprovada: R\$\s0,00/ })).toBeVisible();

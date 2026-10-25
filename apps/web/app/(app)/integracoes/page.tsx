@@ -214,6 +214,9 @@ export default function IntegrationsPage() {
   const [groupFilter, setGroupFilter] = useState("");
   const [stateFilter, setStateFilter] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  // A conexão Meta é gerida no cartão próprio (sem endpoints de webhook).
+  const checkoutConns = (conns.data?.connections ?? []).filter((c) => c.provider !== "meta_ads");
 
   const groups = useMemo(() => [...new Set(catalog.data?.connectors.map((c) => c.group) ?? [])], [catalog.data]);
   const filtered = (catalog.data?.connectors ?? []).filter((c) => (!groupFilter || c.group === groupFilter) && (!stateFilter || c.state === stateFilter));
@@ -249,15 +252,15 @@ export default function IntegrationsPage() {
           />
         </Card>
       )}
-      <Card title="Conexões">
+      <Card title="Conexões de checkout">
         <ErrorBox error={conns.error} onRetry={conns.reload} />
         {conns.loading && !conns.data ? (
           <Skeleton className="h-24" />
-        ) : !conns.data?.connections.length ? (
-          <Empty title="Nenhuma conexão">Crie uma conexão para receber vendas confirmadas.</Empty>
+        ) : !checkoutConns.length ? (
+          <Empty title="Nenhuma conexão de checkout">Crie uma conexão para receber vendas confirmadas.</Empty>
         ) : (
           <Table headers={["Conexão", "Estado", "Recebimentos", "Endpoints", "Ações"]}>
-            {conns.data.connections.map((c) => (
+            {checkoutConns.map((c) => (
               <tr key={c.id}>
                 <Td>
                   <div className="font-medium">{c.name}</div>
@@ -336,7 +339,7 @@ export default function IntegrationsPage() {
           <Skeleton className="h-24" />
         ) : (
           <ul className="divide-y divide-border">
-            {filtered.map((c) => (
+            {(showAll || groupFilter || stateFilter ? filtered : filtered.filter((c) => c.state !== "planned" && c.state !== "researching")).map((c) => (
               <li key={c.id} className="py-2">
                 <button className="flex w-full flex-wrap items-center justify-between gap-2 text-left" onClick={() => setOpenId(openId === c.id ? null : c.id)} aria-expanded={openId === c.id}>
                   <span>
@@ -388,6 +391,11 @@ export default function IntegrationsPage() {
               </li>
             ))}
           </ul>
+        )}
+        {!groupFilter && !stateFilter && filtered.some((c) => c.state === "planned" || c.state === "researching") && (
+          <Button variant="ghost" className="mt-2" onClick={() => setShowAll((v) => !v)}>
+            {showAll ? "Mostrar só as disponíveis" : `Ver também ${filtered.filter((c) => c.state === "planned" || c.state === "researching").length} planejadas/em pesquisa`}
+          </Button>
         )}
       </Card>
     </div>

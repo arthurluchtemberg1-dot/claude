@@ -18,7 +18,7 @@ export default function OnboardingPage() {
         try {
           const r = await api<{ id: string }>("/v1/orgs", { method: "POST", body: form });
           setOrgId(r.id);
-          window.location.href = "/integracoes";
+          window.location.href = "/primeiros-passos";
         } catch (err) {
           if (err instanceof ApiError && err.status === 401) window.location.href = "/entrar";
           setError(err instanceof ApiError ? err.message : "Falha de rede");

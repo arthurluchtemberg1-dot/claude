@@ -50,7 +50,7 @@ export const RULE_METRICS = {
   daily_budget: { label: "Orçamento diário", unit: "money", levels: ["campaign", "adset"], description: "Orçamento diário atual na Meta (só no nível em que está definido).", availability: "active" },
   frequency: { label: "Frequência", unit: "ratio", levels: ENTITY, description: "Impressões ÷ alcance do período.", availability: "planned", unavailableReason: "O alcance de um período não é a soma do alcance diário; leitura por período ainda não implementada" },
   budget_change_pct: { label: "Variação de orçamento (%)", unit: "percent", levels: ENTITY, description: "Mudança de orçamento no período.", availability: "planned", unavailableReason: "Histórico de orçamento ainda não comparado entre sincronizações" },
-  balance: { label: "Saldo da conta", unit: "money", levels: ENTITY, description: "Saldo disponível quando a rede expõe o campo.", availability: "planned", unavailableReason: "Depende da sincronização de contas Meta (DEP-META-APP); ausência nunca vira saldo zero" },
+  balance: { label: "Saldo da conta", unit: "money", levels: ENTITY, description: "Saldo disponível quando a rede expõe o campo.", availability: "planned", unavailableReason: "Saldo pré-pago ainda não é lido (o alerta da conta usa o limite de gasto); ausência nunca vira saldo zero" },
 } as const satisfies Record<string, RuleMetricDef>;
 
 export type RuleMetricKey = keyof typeof RULE_METRICS;
