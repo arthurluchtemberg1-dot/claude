@@ -65,3 +65,8 @@ Procedimentos para incidentes comuns. Comandos assumem acesso ao ambiente e ao `
 ## Alerta "Integração sem eventos" ou "Processamento atrasado"
 1. Siga "Integração de checkout sem eventos" ou "Fila acumulada (outbox)" acima.
 2. Limiares por organização em **Notificações → Alertas da organização** (0 desliga). O alerta só se repete depois que o problema for resolvido e voltar.
+
+## Regra suspensa ou executando de forma inesperada
+1. Parada imediata: **Automação → Pausar todas as regras agora** (organização) ou, no servidor, `RULES_KILL_SWITCH=true` no worker (todas as organizações; simulações continuam).
+2. Abra a regra: o histórico mostra cada decisão com os valores usados, a janela e o motivo de não executar. Motivos de suspensão: falhas consecutivas nas ações (ex.: webhook inativo), permissão retirada de quem ativou.
+3. Corrija e simule de novo; só então reative. Tags internas aplicadas por engano podem ser desfeitas na lista de ações; notificações e webhooks entregues não têm desfazer.

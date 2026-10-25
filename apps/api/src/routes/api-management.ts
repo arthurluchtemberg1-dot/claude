@@ -15,7 +15,7 @@ import { loadSubscriptionSecrets, storeSubscriptionSecret } from "../services/cr
  * Exige `api.manage` e MFA quando a organização o requer. Valores secretos aparecem uma única vez.
  */
 
-const OUT_EVENTS = ["order.approved", "order.reversed", "order.status_changed"] as const;
+const OUT_EVENTS = ["order.approved", "order.reversed", "order.status_changed", "rule.triggered"] as const;
 
 export const apiManagementRoutes =
   (deps: AppDeps): FastifyPluginAsync =>

@@ -49,7 +49,7 @@ const NAV: { href: string; label: string; status?: "planned" }[] = [
   { href: "/configuracoes", label: "Configurações" },
   { href: "/api-webhooks", label: "API e webhooks" },
   { href: "/notificacoes", label: "Notificações" },
-  { href: "/modulos/automacao", label: "Automação", status: "planned" },
+  { href: "/automacao", label: "Automação" },
   { href: "/modulos/ia", label: "Gestor IA", status: "planned" },
   { href: "/modulos/whatsapp-crm", label: "WhatsApp e CRM", status: "planned" },
   { href: "/modulos/funis", label: "Funis e testes", status: "planned" },

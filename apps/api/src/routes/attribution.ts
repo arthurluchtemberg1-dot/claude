@@ -6,8 +6,7 @@ import type { AppDeps } from "../context";
 import { badRequest, conflict, notFound } from "../lib/errors";
 import { audit, jsonSafe, orgSystemTx, orgTx } from "../lib/org-tx";
 import { assertPermission, assertProjectAccess } from "../services/auth";
-import { computeBreakdown } from "../services/breakdown";
-import { orderScopeSql } from "../services/metrics-repo";
+import { computeBreakdown, orderScopeSql } from "@tracker/analytics";
 
 /**
  * Políticas de atribuição (R16-01, R16-02, R16-06, R16-07). A política "default" é a principal (vendas, painel,

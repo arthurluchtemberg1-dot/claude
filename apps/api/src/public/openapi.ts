@@ -205,7 +205,7 @@ export function buildOpenApi(serverUrl: string): Record<string, unknown> {
     },
     "x-webhooks-outbound": {
       description:
-        "Webhooks de saída: POST JSON assinado com X-Tracker-Signature: t=<unix>,id=<entrega>,v1=HMAC_SHA256(segredo, `${t}.${id}.${corpo}`) (dois v1 durante rotação). Entrega pelo menos uma vez; deduplique por X-Tracker-Webhook-Id. Eventos: order.approved, order.reversed, order.status_changed.",
+        "Webhooks de saída: POST JSON assinado com X-Tracker-Signature: t=<unix>,id=<entrega>,v1=HMAC_SHA256(segredo, `${t}.${id}.${corpo}`) (dois v1 durante rotação). Entrega pelo menos uma vez; deduplique por X-Tracker-Webhook-Id. Eventos: order.approved, order.reversed, order.status_changed, rule.triggered (regra com ação de webhook).",
     },
   };
 }

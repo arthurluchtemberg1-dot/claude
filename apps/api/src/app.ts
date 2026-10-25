@@ -25,6 +25,7 @@ import { apiManagementRoutes } from "./routes/api-management";
 import { attributionRoutes } from "./routes/attribution";
 import { customerRoutes } from "./routes/customers";
 import { notificationRoutes } from "./routes/notifications";
+import { ruleRoutes } from "./routes/rules";
 import { publicApi } from "./public/plugin";
 
 /** Rotas públicas sem cookie (CORS aberto, sem credenciais): coleta do SDK e webhooks. */
@@ -117,6 +118,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(attributionRoutes(deps), { prefix: "/v1" });
   await app.register(customerRoutes(deps), { prefix: "/v1" });
   await app.register(notificationRoutes(deps), { prefix: "/v1" });
+  await app.register(ruleRoutes(deps), { prefix: "/v1" });
   await app.register(publicApi(deps), { prefix: "/public/v1" });
   await app.register(ingestRoutes(deps));
   return app;

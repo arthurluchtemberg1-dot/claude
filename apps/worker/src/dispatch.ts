@@ -4,6 +4,7 @@ import { fanoutDestinations, sendDelivery, type DeliveryDeps } from "./handlers/
 import { runMonitors } from "./handlers/monitors";
 import { deliverNotification, notify, notifySale, type NotificationDeps } from "./handlers/notifications";
 import { processReceipt } from "./handlers/process-receipt";
+import { runRuleJob, scheduleDueRules, type RuleRunDeps } from "./handlers/rules";
 import { deliverWebhook, emitWebhookEvent, type OutboundDeps, type OutboundEvent } from "./handlers/webhooks-out";
 
 /**
@@ -18,6 +19,7 @@ export interface WorkerDeps {
   delivery: DeliveryDeps;
   outbound: OutboundDeps;
   notifications: NotificationDeps;
+  rules: RuleRunDeps;
   now: () => Date;
   log: (obj: Record<string, unknown>, msg: string) => void;
 }
@@ -112,7 +114,13 @@ async function runInternal(c: PoolClient, deps: WorkerDeps, orgId: string, topic
       return;
     case "monitor.tick":
       await runMonitors(c, orgId, now);
+      await scheduleDueRules(c, orgId, now);
       return;
+    case "rules.run": {
+      const r = await runRuleJob(c, deps.rules, orgId, payload.rule_id!, now);
+      deps.log({ orgId, rule: payload.rule_id, status: r.status }, "rule_run");
+      return;
+    }
     case "webhooks.emit":
       await emitWebhookEvent(c, orgId, payload as unknown as OutboundEvent, now);
       return;

@@ -42,6 +42,8 @@ export interface NotifyInput {
   redacted?: { title: string; body: string };
   /** Destinatários explícitos (ex.: teste manual); sem isso, membros com permissão e acesso ao projeto. */
   userIds?: string[];
+  /** Sem projeto definido: só membros sem restrição de projeto (dados que podem envolver vários projetos). */
+  onlyUnrestricted?: boolean;
 }
 
 function prefsFromRow(r: Record<string, unknown> | undefined): NotificationPreferences {
@@ -64,13 +66,13 @@ export async function notify(c: PoolClient, orgId: string, n: NotifyInput, now: 
   const members = (
     await c.query(
       `select m.user_id, m.role, p.kinds, p.project_ids, p.quiet_start, p.quiet_end, p.sound_enabled, p.sound_volume, p.hide_amounts,
-              ($2::uuid is null or m.role in ('owner', 'admin')
+              (m.role in ('owner', 'admin') or ($2::uuid is null and not $4::boolean)
                 or not exists (select 1 from public.project_memberships pm where pm.organization_id = m.organization_id and pm.user_id = m.user_id)
                 or exists (select 1 from public.project_memberships pm where pm.organization_id = m.organization_id and pm.user_id = m.user_id and pm.project_id = $2)) as has_access
          from public.memberships m
          left join public.notification_preferences p on p.organization_id = m.organization_id and p.user_id = m.user_id
         where m.organization_id = $1 and m.status = 'active' and ($3::uuid[] is null or m.user_id = any($3))`,
-      [orgId, n.projectId, n.userIds ?? null],
+      [orgId, n.projectId, n.userIds ?? null, n.onlyUnrestricted ?? false],
     )
   ).rows;
   let created = 0;

@@ -57,7 +57,7 @@ Caminho versionado (`/public/v1`). Adições compatíveis (campos novos, endpoin
 
 ## Webhooks de saída
 
-- Eventos: `order.approved` (por transação aprovada pela primeira vez), `order.reversed` (por lançamento de estorno/chargeback), `order.status_changed`. Payload sem dados pessoais: IDs, valores, status e atribuição atual (`null` se ainda não calculada).
+- Eventos: `order.approved` (por transação aprovada pela primeira vez), `order.reversed` (por lançamento de estorno/chargeback), `order.status_changed` e `rule.triggered` (enviado só às assinaturas escolhidas na ação "webhook" de uma regra: regra, versão, entidade, decisão, explicação e métricas usadas). Payload sem dados pessoais: IDs, valores, status e atribuição atual (`null` se ainda não calculada).
 - Cadastro recusa destinos em rede privada, loopback, link-local/metadata, CGNAT, multicast, esquemas diferentes de http/https, credenciais na URL e o próprio Tracker. A resolução DNS é validada **no momento da conexão** e a cada redirecionamento (até 3; só 307/308 são seguidos). Tempo e tamanho de resposta limitados.
 - A assinatura nasce **pausada**; a ativação exige que o destino responda 2xx a um `test.ping` assinado.
 - Entrega **pelo menos uma vez**: deduplique por `X-Tracker-Webhook-Id` (estável entre tentativas). Falhas: novas tentativas em ~1 min, 5 min, 30 min, 2 h, 6 h, 12 h e 24 h; depois a entrega vai para a fila de falhas e pode ser reenviada manualmente.

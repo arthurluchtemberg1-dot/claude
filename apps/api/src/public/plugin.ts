@@ -8,9 +8,8 @@ import { hmacToken } from "../lib/crypto";
 import { HttpError, badRequest, forbidden, notFound } from "../lib/errors";
 import { jsonSafe } from "../lib/org-tx";
 import { API_KEY_RE, type ApiKeyContext, type ApiScope } from "../services/api-keys";
-import { computeBreakdown } from "../services/breakdown";
+import { computeBreakdown, computeScopeMetrics } from "@tracker/analytics";
 import { createManualSale, manualSaleSchema } from "../services/manual-sale";
-import { computeScopeMetrics } from "../services/metrics-repo";
 import { buildOpenApi } from "./openapi";
 
 /**

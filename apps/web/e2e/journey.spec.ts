@@ -114,8 +114,12 @@ test("T70 jornada completa: cadastro → conexão Lowify → visita com SDK → 
     await expect(page.getByRole("link", { name: orderId })).toBeVisible({ timeout: 4000 });
   }).toPass({ timeout: 45_000 });
   await expect(page.getByRole("row", { name: new RegExp(orderId) }).getByText("Aprovada")).toBeVisible();
-  await page.getByRole("link", { name: orderId }).click();
-  await expect(page.getByText(/evidência token_link/)).toBeVisible();
+  const detailHref = (await page.getByRole("link", { name: orderId }).getAttribute("href"))!;
+  // A atribuição é calculada pelo worker logo após a aprovação (outro item da fila): reabre até aparecer.
+  await expect(async () => {
+    await page.goto(detailHref);
+    await expect(page.getByText(/evidência token_link/)).toBeVisible({ timeout: 3000 });
+  }).toPass({ timeout: 45_000 });
   await expect(page.getByText("Checkout devolveu token", { exact: false })).toBeVisible();
   await expect(page.getByText(/R\$\s199,90/).first()).toBeVisible();
 
@@ -175,6 +179,24 @@ test("T70 jornada completa: cadastro → conexão Lowify → visita com SDK → 
   expect(sw.headers()["cache-control"]).toMatch(/no-cache/);
   expect(await page.evaluate(async () => Boolean(await navigator.serviceWorker.getRegistration("/")))).toBe(true);
 
+  // 7a2. Automação (R26, R23-11): exemplo sem valor pronto → preencher → simular → salvar → simular → ativar.
+  await page.goto("/automacao");
+  await page.getByRole("listitem").filter({ hasText: "Exemplo: meta de receita do dia atingida" }).getByRole("button", { name: "Usar este exemplo" }).click();
+  await page.getByRole("button", { name: "Simular" }).click();
+  await expect(page.getByText(/Preencha o valor de "Receita aprovada/)).toBeVisible();
+  await page.getByLabel("Valor 1").fill("100");
+  await page.getByRole("button", { name: "Simular" }).click();
+  await expect(page.getByTestId("simulation-result").getByText("Executaria (simulação)", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("simulation-result").getByText(/R\$\s199,90 ≥ R\$\s100,00/)).toBeVisible();
+  await page.getByRole("button", { name: "Salvar como rascunho" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "meta de receita do dia atingida" })).toBeVisible();
+  await page.getByRole("button", { name: "Ativar" }).click();
+  await expect(page.getByText(/Simule a versão atual da regra antes de ativar/)).toBeVisible();
+  await page.getByRole("button", { name: "Simular (agora + 3 dias)" }).click();
+  await expect(page.getByText("Resultado da simulação")).toBeVisible();
+  await page.getByRole("button", { name: "Ativar" }).click();
+  await expect(page.getByText("Ativa", { exact: true })).toBeVisible();
+
   // 7b. API pública: chave exibida uma única vez e usável; revogação imediata.
   await page.goto("/api-webhooks");
   await page.getByRole("button", { name: "Criar chave" }).click();
@@ -208,6 +230,6 @@ test("telas públicas: login com senha errada mostra erro acionável e não reve
 test("módulo não implementado é identificado como planejado (R39-01)", async ({ page }) => {
   await page.goto("/entrar");
   // Sem sessão, rotas internas redirecionam para login.
-  await page.goto("/modulos/automacao");
+  await page.goto("/modulos/funis");
   await expect(page).toHaveURL(/\/entrar/);
 });

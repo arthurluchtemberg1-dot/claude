@@ -49,6 +49,7 @@ const deps: WorkerDeps = {
     push: vapid ? createPushSender(vapid, { ...outboundPolicy, requireHttps: true }, pushHostsFromEnv(process.env)) : null,
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   },
+  rules: { systemKillSwitch: process.env.RULES_KILL_SWITCH === "true" },
 };
 
 const worker = new Worker(

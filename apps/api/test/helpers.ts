@@ -77,6 +77,7 @@ export async function createHarness(overrides: Partial<Record<string, string>> =
       },
       appUrl: "http://localhost:3000",
     },
+    rules: { systemKillSwitch: false },
   };
   return {
     app,

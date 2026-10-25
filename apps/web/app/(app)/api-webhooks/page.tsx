@@ -20,6 +20,7 @@ const EVENT_LABELS: Record<string, string> = {
   "order.approved": "Venda aprovada",
   "order.reversed": "Estorno/chargeback",
   "order.status_changed": "Mudança de status do pedido",
+  "rule.triggered": "Regra disparada (ação de webhook)",
 };
 const DELIVERY_TONE: Record<string, "ok" | "warn" | "err" | "neutral"> = { succeeded: "ok", pending: "neutral", retry_scheduled: "warn", dead: "err", blocked: "err", skipped: "neutral" };
 

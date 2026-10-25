@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { AppDeps } from "../context";
 import { jsonSafe, orgTx } from "../lib/org-tx";
 import { assertPermission, assertProjectAccess } from "../services/auth";
-import { chosenSpendSql, computeScopeMetrics } from "../services/metrics-repo";
+import { chosenSpendSql, computeScopeMetrics } from "@tracker/analytics";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 

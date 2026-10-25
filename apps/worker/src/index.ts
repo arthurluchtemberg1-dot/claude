@@ -8,3 +8,4 @@ export * from "./handlers/webhooks-out";
 export * from "./handlers/notifications";
 export * from "./handlers/monitors";
 export * from "./scheduler";
+export * from "./handlers/rules";
