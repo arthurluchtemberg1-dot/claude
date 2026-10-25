@@ -1,6 +1,8 @@
 import { withTx, type Pool, type PoolClient } from "@tracker/db";
 import { computeAttribution } from "./handlers/attribution";
 import { fanoutDestinations, sendDelivery, type DeliveryDeps } from "./handlers/deliveries";
+import { runMonitors } from "./handlers/monitors";
+import { deliverNotification, notify, notifySale, type NotificationDeps } from "./handlers/notifications";
 import { processReceipt } from "./handlers/process-receipt";
 import { deliverWebhook, emitWebhookEvent, type OutboundDeps, type OutboundEvent } from "./handlers/webhooks-out";
 
@@ -15,6 +17,7 @@ export interface WorkerDeps {
   tokenHmacKey: Buffer;
   delivery: DeliveryDeps;
   outbound: OutboundDeps;
+  notifications: NotificationDeps;
   now: () => Date;
   log: (obj: Record<string, unknown>, msg: string) => void;
 }
@@ -59,7 +62,7 @@ export async function dispatchOutboxItem(deps: WorkerDeps, orgId: string, outbox
       if (!item) return { skip: true as const };
       if (item.status === "done" || item.status === "dead") return { skip: true as const };
       const now = deps.now();
-      if (item.topic === "delivery.send" || item.topic === "webhooks.deliver") return { external: true as const, topic: item.topic as string, payload: item.payload };
+      if (item.topic === "delivery.send" || item.topic === "webhooks.deliver" || item.topic === "notifications.deliver") return { external: true as const, topic: item.topic as string, payload: item.payload };
       await runInternal(c, deps, orgId, item.topic, item.payload, now);
       await c.query("update public.outbox set status = 'done', completed_at = now(), last_error = null where id = $1", [outboxId]);
       return { done: true as const };
@@ -69,6 +72,7 @@ export async function dispatchOutboxItem(deps: WorkerDeps, orgId: string, outbox
     // Efeito externo: fora da transação do item; o próprio envio registra tentativas e reagenda.
     const runTx = <T>(fn: (c: PoolClient) => Promise<T>) => withTx(pool, { organizationId: orgId }, fn);
     if (topic.topic === "webhooks.deliver") await deliverWebhook(runTx, deps.outbound, orgId, topic.payload.delivery_id, deps.now());
+    else if (topic.topic === "notifications.deliver") await deliverNotification(runTx, deps.notifications, orgId, topic.payload.delivery_id, deps.now());
     else await sendDelivery(runTx, deps.delivery, orgId, topic.payload.delivery_id, deps.now());
     await withTx(pool, { organizationId: orgId }, (c) => c.query("update public.outbox set status = 'done', completed_at = now() where id = $1", [outboxId]));
     return "done";
@@ -89,9 +93,25 @@ async function runInternal(c: PoolClient, deps: WorkerDeps, orgId: string, topic
     }
     case "attribution.compute":
       await computeAttribution(c, { tokenHmacKey: deps.tokenHmacKey }, orgId, payload.order_id!, now);
+      // Primeira aprovação: a notificação de venda sai já com a origem atribuída (mesma transação).
+      if (payload.notify_tx) await notifySale(c, orgId, { kind: "sale.approved", orderId: payload.order_id!, transactionKey: payload.notify_tx }, now);
       return;
     case "destinations.fanout":
       await fanoutDestinations(c, { environment: deps.delivery.environment }, orgId, payload.order_id!, payload.transaction_key!, now);
+      return;
+    case "notifications.test":
+      await notify(c, orgId, {
+        kind: "system.test",
+        projectId: null,
+        semanticKey: `system.test:${payload.key}`,
+        title: "Teste de notificação",
+        body: "Se você recebeu esta mensagem, este canal está funcionando.",
+        link: "/notificacoes",
+        userIds: [payload.user_id!],
+      }, now);
+      return;
+    case "monitor.tick":
+      await runMonitors(c, orgId, now);
       return;
     case "webhooks.emit":
       await emitWebhookEvent(c, orgId, payload as unknown as OutboundEvent, now);

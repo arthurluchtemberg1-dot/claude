@@ -54,3 +54,14 @@ Procedimentos para incidentes comuns. Comandos assumem acesso ao ambiente e ao `
 2. Corrija o destino e use "Enviar teste"; depois "Reenviar" nas entregas da fila de falhas (mesmo `X-Tracker-Webhook-Id`, o receptor deduplica).
 3. Segredo vazado: "Rotacionar segredo" — por 24 h as entregas levam as duas assinaturas; depois só a nova.
 4. Loop entre sistemas: entradas com `X-Tracker-Hop` acima de 3 são recusadas (`508`) e aparecem em rejeições do endpoint.
+
+## Notificações não chegam (push/e-mail)
+1. Em **Notificações → Push neste dispositivo**, veja o estado do canal: "Web Push não configurado" = faltam `WEB_PUSH_VAPID_PUBLIC_KEY`/`WEB_PUSH_VAPID_PRIVATE_KEY`/`WEB_PUSH_SUBJECT` (gere com `pnpm push:keys`); "Envio externo desligado" = `ALLOW_EXTERNAL_DELIVERY=false` no ambiente.
+2. Use **Enviar notificação de teste**. Se aparece no sino mas não no dispositivo: permissão do navegador, modo "não perturbe" do sistema ou horário silencioso nas preferências.
+3. Inscrição marcada como "expirada ou recusada": o serviço de push respondeu 404/410 — reative o push no dispositivo.
+4. Consulta (operador): `select channel, status, last_error, last_http_status from public.notification_deliveries where organization_id = '<org>' order by created_at desc limit 20;`
+5. Trocar as chaves VAPID invalida todas as inscrições: comunique os usuários antes.
+
+## Alerta "Integração sem eventos" ou "Processamento atrasado"
+1. Siga "Integração de checkout sem eventos" ou "Fila acumulada (outbox)" acima.
+2. Limiares por organização em **Notificações → Alertas da organização** (0 desliga). O alerta só se repete depois que o problema for resolvido e voltar.

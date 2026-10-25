@@ -1,4 +1,4 @@
-import { outboundPolicyFromEnv, type SafeHttpPolicy } from "@tracker/connectors";
+import { outboundPolicyFromEnv, pushHostsFromEnv, vapidFromEnv, type SafeHttpPolicy, type VapidConfig } from "@tracker/connectors";
 import { z } from "zod";
 
 /**
@@ -58,6 +58,8 @@ export type AppConfig = z.infer<typeof schema> & {
   mfaRequiredDefault: boolean;
   /** Política anti-SSRF de saída (webhooks de saída), mesma regra do worker. */
   outboundPolicy: SafeHttpPolicy;
+  /** Web Push: chave pública VAPID exposta ao navegador; null = push não configurado. */
+  webPush: { publicKey: string; allowedHosts: string[] } | null;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -87,5 +89,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     tokenHmacKey: Buffer.from(c.TOKEN_HMAC_SECRET, "base64"),
     mfaRequiredDefault: c.MFA_REQUIRED_DEFAULT ?? c.APP_ENV === "production",
     outboundPolicy: outboundPolicyFromEnv(env),
+    webPush: webPushFrom(env),
   };
+}
+
+function webPushFrom(env: NodeJS.ProcessEnv): AppConfig["webPush"] {
+  const v: VapidConfig | null = vapidFromEnv(env);
+  return v ? { publicKey: v.publicKey, allowedHosts: pushHostsFromEnv(env) } : null;
 }

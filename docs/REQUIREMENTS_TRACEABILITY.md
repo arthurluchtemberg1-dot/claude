@@ -2,16 +2,16 @@
 
 > Arquivo **gerado** por `pnpm traceability` a partir de [`PRD.md`](PRD.md) e [`traceability/status.json`](traceability/status.json). Edite o JSON e regenere; o comando falha se algum requisito do PRD ou cenário T01–T70 desaparecer.
 
-Atualizado em: 2026-09-24. Estados de requisito conforme R11-03/R46-01: "Implementado localmente" = código + testes executados neste repositório; não significa validado com o provedor externo.
+Atualizado em: 2026-10-25. Estados de requisito conforme R11-03/R46-01: "Implementado localmente" = código + testes executados neste repositório; não significa validado com o provedor externo.
 
 ## Resumo
 
 | Estado | Requisitos |
 | --- | --- |
-| ✅ Implementado localmente | 223 |
-| 🟡 Parcial | 75 |
+| ✅ Implementado localmente | 226 |
+| 🟡 Parcial | 76 |
 | ⛔ Bloqueado externamente | 12 |
-| ⏳ Planejado | 113 |
+| ⏳ Planejado | 109 |
 | 📄 Método/documento | 13 |
 | **Total** | **436** |
 
@@ -234,7 +234,7 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 | R09-06 | Responder rápido, após persistência, sem aguardar CAPI/relatórios/IA. | E2 | ✅ Implementado localmente | 200 após commit; processamento assíncrono via outbox | webhook-pipeline.test.ts |  |  |
 | R09-07 | Normalizar e processar no worker com transações e locks. | E2 | ✅ Implementado localmente | apps/api/src/services/ingest-webhook.ts, apps/worker/src/dispatch.ts, handlers/process-receipt.ts | webhook-pipeline.test.ts |  |  |
 | R09-08 | Atualizar pedido e lançamentos; efeitos externos por outbox. | E2 | ✅ Implementado localmente | apps/api/src/services/ingest-webhook.ts, apps/worker/src/dispatch.ts, handlers/process-receipt.ts | webhook-pipeline.test.ts |  |  |
-| R09-09 | Agendar atribuição, agregações e notificações sem duplicar efeitos. | E2 | 🟡 Parcial | attribution.compute e destinations.fanout por outbox com dedup | webhook-pipeline.test.ts |  | Notificações e agregações incrementais pendentes |
+| R09-09 | Agendar atribuição, agregações e notificações sem duplicar efeitos. | E2 | ✅ Implementado localmente | attribution.compute, destinations.fanout, notificações e ciclos do agendador (monitor.tick por janela) via outbox com dedup | webhook-pipeline.test.ts; notifications.test.ts (monitores sem repetição) |  | Agregações incrementais não são necessárias com as consultas atuais (D-028) |
 | R09-10 | Registrar tentativas, erro acionável, próxima tentativa e resultado final. | E2 | ✅ Implementado localmente | outbox.attempts/last_error/available_at; delivery_attempts; status de recebimento | deliveries-relay.test.ts |  |  |
 | R09-11 | Sem persistência, não confirmar recebimento. | E2 | ✅ Implementado localmente | 503 quando a persistência falha (routes/ingest.ts) | — |  | Teste de falha de banco dedicado pendente |
 | R09-12 | Evento válido desconhecido guardado para diagnóstico sem virar venda. | E2 | ✅ Implementado localmente | apps/api/src/services/ingest-webhook.ts, apps/worker/src/dispatch.ts, handlers/process-receipt.ts | webhook-pipeline.test.ts |  |  |
@@ -627,16 +627,16 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 
 | ID | Requisito | Etapa | Estado | Implementação | Testes | Dependência | Observação |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| R34-01 | Central com preferências por usuário, projeto, tipo e horário; canais painel, e-mail, web push, app; Telegram/Slack/WhatsApp só conectados. | E8 | ⏳ Planejado | Etapa E8 |  |  |  |
-| R34-02 | Alertas: venda aprovada, reembolso, chargeback, meta, conexão perdida, token expirando, fila atrasada, custo excedido, gasto sem conversão,… | E8 | ⏳ Planejado | Etapa E8 |  |  |  |
-| R34-03 | Deduplicar por evento semântico; som de venda opcional com teste/mute/volume, sem reemitir vendas antigas. | E8 | ⏳ Planejado | Deduplicação de notificações |  |  |  |
-| R34-04 | Tela bloqueada sem dados pessoais; push dependente de consentimento; falha de push não interrompe registro da venda. | E8 | ⏳ Planejado | Etapa E8 |  |  |  |
+| R34-01 | Central com preferências por usuário, projeto, tipo e horário; canais painel, e-mail, web push, app; Telegram/Slack/WhatsApp só conectados. | E8 | 🟡 Parcial | migrations/0017 (notifications, notification_preferences, push_subscriptions, notification_deliveries); apps/worker/src/handlers/notifications.ts; apps/api/src/routes/notifications.ts; apps/web/app/(app)/notificacoes, components/notifications-bell.tsx | apps/api/test/integration/notifications.test.ts; packages/domain/test/notifications.test.ts; packages/connectors/test/web-push.test.ts; E2E T70 |  | Painel, e-mail e Web Push (VAPID) com preferências por usuário/projeto/tipo e horário silencioso. Canal de app nativo depende de R35-02; Telegram/Slack/WhatsApp não implementados (só quando conectados) |
+| R34-02 | Alertas: venda aprovada, reembolso, chargeback, meta, conexão perdida, token expirando, fila atrasada, custo excedido, gasto sem conversão,… | E8 | 🟡 Parcial | Venda aprovada/renovação/upsell, reembolso, chargeback (process-receipt/attribution); integração sem eventos ou falhando, fila atrasada, falha de envio de conversão e webhook de saída (handlers/monitors.ts, agendador por outbox) | apps/api/test/integration/notifications.test.ts; packages/domain/test/notifications.test.ts; packages/connectors/test/web-push.test.ts; E2E T70 | DEP-META-APP (saldo baixo, token expirando); DEP-BILLING (cobrança) | Meta atingida, custo excedido e gasto sem conversão virão do motor de regras (R26); saldo baixo/token só com conta Meta sincronizada — tipos aparecem como planejados com motivo |
+| R34-03 | Deduplicar por evento semântico; som de venda opcional com teste/mute/volume, sem reemitir vendas antigas. | E8 | ✅ Implementado localmente | Unicidade (organização, usuário, fato semântico); entregas únicas por canal/dispositivo; som sintetizado opcional com teste/volume, só para notificações posteriores à abertura e uma vez entre abas (apps/web/lib/notifications.ts) | apps/api/test/integration/notifications.test.ts; packages/domain/test/notifications.test.ts; packages/connectors/test/web-push.test.ts; E2E T70 |  |  |
+| R34-04 | Tela bloqueada sem dados pessoais; push dependente de consentimento; falha de push não interrompe registro da venda. | E8 | ✅ Implementado localmente | Texto sem dados do comprador (domínio saleNotificationText); opção ocultar valores no push/e-mail; push só após permissão do navegador; entrega via outbox fora da transação da venda (falha não afeta o registro) | apps/api/test/integration/notifications.test.ts; packages/domain/test/notifications.test.ts; packages/connectors/test/web-push.test.ts; E2E T70 |  | Entrega de push depende do navegador/serviço de push; não é garantida |
 
 ### 35. Mobile, PWA e app nativo
 
 | ID | Requisito | Etapa | Estado | Implementação | Testes | Dependência | Observação |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| R35-01 | Web responsiva e PWA instalável primeiro; dashboard, vendas, notificações, filtros e diagnóstico em telas pequenas. | E9 | 🟡 Parcial | Web responsiva + manifest PWA | — |  | Service worker/offline pendente |
+| R35-01 | Web responsiva e PWA instalável primeiro; dashboard, vendas, notificações, filtros e diagnóstico em telas pequenas. | E9 | 🟡 Parcial | Manifesto via app/manifest.ts (marca configurável), ícones PNG 192/512/maskable, service worker (push, clique, página sem conexão sem ações), layout responsivo | E2E T70 (manifesto, sw.js sem cache, registro do service worker) |  | Revisão visual em telas pequenas das telas principais pendente |
 | R35-02 | App `apps/mobile` (Expo) com API compartilhada, armazenamento seguro, biometria opcional, push, deep links e troca de organização. | E9 | ⏳ Planejado | Etapa E9 |  |  |  |
 | R35-03 | Escopo móvel: métricas, vendas, integrações, regras, campanhas, ações com mesma validação, modo leitura, offline datado sem ações silencios… | E9 | ⏳ Planejado | Etapa E9 |  |  |  |
 | R35-04 | Publicação em lojas só declarada após publicação real; PWA não prova app nas lojas. | E9 | ⏳ Planejado | Etapa E9 |  |  |  |

@@ -24,6 +24,8 @@ const config: NextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
       },
+      // Service worker do PWA/Web Push: sempre revalidado, para que correções cheguem aos dispositivos instalados.
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }, { key: "Service-Worker-Allowed", value: "/" }] },
     ];
   },
 };

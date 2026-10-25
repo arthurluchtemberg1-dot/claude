@@ -4,9 +4,10 @@ import { Redis } from "ioredis";
 import pino from "pino";
 import { createPool, requireEnv } from "@tracker/db";
 import { dispatchOutboxItem, type WorkerDeps } from "./dispatch";
-import { outboundPolicyFromEnv } from "@tracker/connectors";
+import { createEmailSender, createPushSender, outboundPolicyFromEnv, pushHostsFromEnv, vapidFromEnv } from "@tracker/connectors";
 import { createSecretLoader, createSubscriptionSecretLoader } from "./secrets";
 import { OUTBOX_QUEUE, relayOnce } from "./relay";
+import { schedulerOnce } from "./scheduler";
 
 /**
  * Processo persistente do worker (R41-06): relay da outbox, consumidor BullMQ, health check e encerramento gracioso.
@@ -19,6 +20,17 @@ const redisUrl = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
 const connection = new Redis(redisUrl, { maxRetriesPerRequest: null, enableReadyCheck: true });
 const queue = new Queue(OUTBOX_QUEUE, { connection });
 
+const outboundPolicy = outboundPolicyFromEnv(process.env);
+const vapid = vapidFromEnv(process.env);
+const emailTransport = process.env.EMAIL_TRANSPORT ?? "log";
+const email = createEmailSender(
+  emailTransport,
+  (o, m) => log.info(o, m),
+  process.env.APP_ENV === "production",
+  process.env.EMAIL_OUTBOX_DIR,
+  process.env.SMTP_URL ? { url: process.env.SMTP_URL, from: process.env.EMAIL_FROM ?? "Tracker <no-reply@example.com>" } : undefined,
+);
+
 const deps: WorkerDeps = {
   pools: { system },
   tokenHmacKey: Buffer.from(requireEnv("TOKEN_HMAC_SECRET"), "base64"),
@@ -30,7 +42,13 @@ const deps: WorkerDeps = {
     fetchImpl: fetch,
     loadSecret: createSecretLoader(),
   },
-  outbound: { policy: outboundPolicyFromEnv(process.env), loadSecrets: createSubscriptionSecretLoader() },
+  outbound: { policy: outboundPolicy, loadSecrets: createSubscriptionSecretLoader() },
+  notifications: {
+    allowExternal: process.env.ALLOW_EXTERNAL_DELIVERY === "true",
+    email,
+    push: vapid ? createPushSender(vapid, { ...outboundPolicy, requireHttps: true }, pushHostsFromEnv(process.env)) : null,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  },
 };
 
 const worker = new Worker(
@@ -58,6 +76,19 @@ async function relayLoop() {
 }
 void relayLoop();
 
+// Agendador de ciclos periódicos (monitores de alerta). Falha aqui não afeta o processamento de vendas.
+let schedulerTimer: NodeJS.Timeout | null = null;
+async function schedulerLoop() {
+  try {
+    const n = await schedulerOnce(system, new Date());
+    if (n) log.debug({ ticks: n }, "scheduler_ticks");
+  } catch (err) {
+    log.warn({ err: (err as Error).message }, "scheduler_error");
+  }
+  schedulerTimer = setTimeout(schedulerLoop, Number(process.env.SCHEDULER_INTERVAL_MS ?? 60_000));
+}
+void schedulerLoop();
+
 // Health/readiness para orquestradores.
 const health = createServer(async (req, res) => {
   if (req.url === "/health") return res.writeHead(200).end("ok");
@@ -78,6 +109,7 @@ health.listen(Number(process.env.WORKER_HEALTH_PORT ?? 4100));
 async function shutdown(signal: string) {
   log.info({ signal }, "worker_shutdown_start");
   if (relayTimer) clearTimeout(relayTimer);
+  if (schedulerTimer) clearTimeout(schedulerTimer);
   health.close();
   await worker.close(); // aguarda jobs em andamento
   await queue.close();
@@ -88,4 +120,4 @@ async function shutdown(signal: string) {
 }
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
-log.info({ redis: redisUrl.replace(/\/\/.*@/, "//***@") }, "worker_started");
+log.info({ redis: redisUrl.replace(/\/\/.*@/, "//***@"), web_push: Boolean(vapid), email: emailTransport }, "worker_started");

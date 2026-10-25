@@ -1,6 +1,6 @@
 {
   "generated_from": "docs/PRD.md",
-  "updated": "2026-09-24",
+  "updated": "2026-10-25",
   "requirements": [
     {
       "status": "partial",
@@ -804,11 +804,11 @@
       "stage": "E2"
     },
     {
-      "status": "partial",
-      "impl": "attribution.compute e destinations.fanout por outbox com dedup",
-      "tests": "webhook-pipeline.test.ts",
+      "status": "done",
+      "impl": "attribution.compute, destinations.fanout, notificações e ciclos do agendador (monitor.tick por janela) via outbox com dedup",
+      "tests": "webhook-pipeline.test.ts; notifications.test.ts (monitores sem repetição)",
       "dep": "",
-      "note": "Notificações e agregações incrementais pendentes",
+      "note": "Agregações incrementais não são necessárias com as consultas atuais (D-028)",
       "id": "R09-09",
       "stage": "E2"
     },
@@ -3216,47 +3216,47 @@
       "stage": "E8"
     },
     {
-      "status": "planned",
-      "impl": "Etapa E8",
-      "tests": "",
+      "status": "partial",
+      "impl": "migrations/0017 (notifications, notification_preferences, push_subscriptions, notification_deliveries); apps/worker/src/handlers/notifications.ts; apps/api/src/routes/notifications.ts; apps/web/app/(app)/notificacoes, components/notifications-bell.tsx",
+      "tests": "apps/api/test/integration/notifications.test.ts; packages/domain/test/notifications.test.ts; packages/connectors/test/web-push.test.ts; E2E T70",
       "dep": "",
-      "note": "",
+      "note": "Painel, e-mail e Web Push (VAPID) com preferências por usuário/projeto/tipo e horário silencioso. Canal de app nativo depende de R35-02; Telegram/Slack/WhatsApp não implementados (só quando conectados)",
       "id": "R34-01",
       "stage": "E8"
     },
     {
-      "status": "planned",
-      "impl": "Etapa E8",
-      "tests": "",
-      "dep": "",
-      "note": "",
+      "status": "partial",
+      "impl": "Venda aprovada/renovação/upsell, reembolso, chargeback (process-receipt/attribution); integração sem eventos ou falhando, fila atrasada, falha de envio de conversão e webhook de saída (handlers/monitors.ts, agendador por outbox)",
+      "tests": "apps/api/test/integration/notifications.test.ts; packages/domain/test/notifications.test.ts; packages/connectors/test/web-push.test.ts; E2E T70",
+      "dep": "DEP-META-APP (saldo baixo, token expirando); DEP-BILLING (cobrança)",
+      "note": "Meta atingida, custo excedido e gasto sem conversão virão do motor de regras (R26); saldo baixo/token só com conta Meta sincronizada — tipos aparecem como planejados com motivo",
       "id": "R34-02",
       "stage": "E8"
     },
     {
-      "status": "planned",
-      "impl": "Deduplicação de notificações",
-      "tests": "",
+      "status": "done",
+      "impl": "Unicidade (organização, usuário, fato semântico); entregas únicas por canal/dispositivo; som sintetizado opcional com teste/volume, só para notificações posteriores à abertura e uma vez entre abas (apps/web/lib/notifications.ts)",
+      "tests": "apps/api/test/integration/notifications.test.ts; packages/domain/test/notifications.test.ts; packages/connectors/test/web-push.test.ts; E2E T70",
       "dep": "",
       "note": "",
       "id": "R34-03",
       "stage": "E8"
     },
     {
-      "status": "planned",
-      "impl": "Etapa E8",
-      "tests": "",
+      "status": "done",
+      "impl": "Texto sem dados do comprador (domínio saleNotificationText); opção ocultar valores no push/e-mail; push só após permissão do navegador; entrega via outbox fora da transação da venda (falha não afeta o registro)",
+      "tests": "apps/api/test/integration/notifications.test.ts; packages/domain/test/notifications.test.ts; packages/connectors/test/web-push.test.ts; E2E T70",
       "dep": "",
-      "note": "",
+      "note": "Entrega de push depende do navegador/serviço de push; não é garantida",
       "id": "R34-04",
       "stage": "E8"
     },
     {
       "status": "partial",
-      "impl": "Web responsiva + manifest PWA",
-      "tests": "—",
+      "impl": "Manifesto via app/manifest.ts (marca configurável), ícones PNG 192/512/maskable, service worker (push, clique, página sem conexão sem ações), layout responsivo",
+      "tests": "E2E T70 (manifesto, sw.js sem cache, registro do service worker)",
       "dep": "",
-      "note": "Service worker/offline pendente",
+      "note": "Revisão visual em telas pequenas das telas principais pendente",
       "id": "R35-01",
       "stage": "E9"
     },

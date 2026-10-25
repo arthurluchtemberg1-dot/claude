@@ -197,7 +197,8 @@ export interface SafeRequest {
   url: string;
   method?: "POST" | "GET";
   headers?: Record<string, string>;
-  body?: string;
+  /** Texto (JSON) ou binário (ex.: corpo cifrado de Web Push). */
+  body?: string | Uint8Array;
 }
 
 export type SafeResponse =

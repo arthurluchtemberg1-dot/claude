@@ -17,3 +17,5 @@ export const CHECKOUT_CONNECTORS: Readonly<Record<string, CheckoutConnector>> = 
   lowify: lowifyConnector,
   custom: canonicalConnector,
 };
+export * from "./outbound/email";
+export * from "./outbound/web-push";

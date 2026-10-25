@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, ApiError, getOrgId, setOrgId, useApi } from "@/lib/api";
 import { BRAND } from "@/lib/brand";
+import { NotificationsBell } from "./notifications-bell";
 import { Badge, Button, cx, Select, Skeleton } from "./ui";
 
 export interface Me {
@@ -47,6 +48,7 @@ const NAV: { href: string; label: string; status?: "planned" }[] = [
   { href: "/diagnostico", label: "Diagnóstico" },
   { href: "/configuracoes", label: "Configurações" },
   { href: "/api-webhooks", label: "API e webhooks" },
+  { href: "/notificacoes", label: "Notificações" },
   { href: "/modulos/automacao", label: "Automação", status: "planned" },
   { href: "/modulos/ia", label: "Gestor IA", status: "planned" },
   { href: "/modulos/whatsapp-crm", label: "WhatsApp e CRM", status: "planned" },
@@ -219,6 +221,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <div className="flex items-center gap-2 text-sm">
               {!value.me.user.email_verified && <Badge tone="warn">E-mail não verificado</Badge>}
+              <NotificationsBell timezone={value.org.organization.timezone} />
               <span className="hidden text-muted sm:inline">{value.me.user.display_name}</span>
               <ThemeToggle />
               <Button variant="secondary" onClick={logout}>

@@ -149,6 +149,32 @@ test("T70 jornada completa: cadastro → conexão Lowify → visita com SDK → 
   await expect(page.getByRole("button", { name: /Receita após estornos: R\$\s0,00/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Receita bruta aprovada: R\$\s199,90/ })).toBeVisible();
 
+  // 7a. Notificações (R34): sino com não lidas; venda com origem e sem dados do comprador; estorno; página da central.
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByTestId("notifications-unread")).toBeVisible({ timeout: 4000 });
+  }).toPass({ timeout: 45_000 });
+  await page.getByTestId("notifications-bell").click();
+  const recent = page.getByRole("dialog", { name: "Notificações recentes" });
+  await expect(recent.getByText(/Venda aprovada · R\$\s199,90/)).toBeVisible();
+  await expect(recent.getByText(/Campanha E2E/)).toBeVisible();
+  await expect(recent.getByText(/^Reembolso · R\$\s199,90$/)).toBeVisible();
+  await expect(recent.getByText("Cliente Exemplo")).toHaveCount(0);
+  await recent.getByRole("link", { name: "Ver todas e preferências" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Notificações" })).toBeVisible();
+  await expect(page.getByTestId("notifications-list").getByText(/Venda aprovada · R\$\s199,90/)).toBeVisible();
+  await expect(page.getByText("Saldo baixo na conta de anúncios")).toBeVisible();
+  await page.getByRole("button", { name: "Marcar todas como lidas" }).first().click();
+  await expect(page.getByTestId("notifications-unread")).toHaveCount(0);
+  // PWA: manifesto com ícones instaláveis e service worker servido sem cache.
+  const manifest = await request.get(`${E2E.webUrl}/manifest.webmanifest`);
+  expect(manifest.status()).toBe(200);
+  expect((await manifest.json()).icons.map((i: { sizes: string }) => i.sizes)).toEqual(expect.arrayContaining(["192x192", "512x512"]));
+  const sw = await request.get(`${E2E.webUrl}/sw.js`);
+  expect(sw.status()).toBe(200);
+  expect(sw.headers()["cache-control"]).toMatch(/no-cache/);
+  expect(await page.evaluate(async () => Boolean(await navigator.serviceWorker.getRegistration("/")))).toBe(true);
+
   // 7b. API pública: chave exibida uma única vez e usável; revogação imediata.
   await page.goto("/api-webhooks");
   await page.getByRole("button", { name: "Criar chave" }).click();

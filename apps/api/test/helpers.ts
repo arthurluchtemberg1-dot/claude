@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
+import type { PushPayload, PushResult, PushTarget } from "@tracker/connectors";
 import { createPool } from "@tracker/db";
 import { drainOutbox, type WorkerDeps } from "@tracker/worker";
 import { TEST_DB } from "../../../test/env";
@@ -17,8 +18,15 @@ export interface Harness {
   admin: pg.Pool;
   worker: WorkerDeps;
   emails: EmailMessage[];
+  pushes: PushCall[];
+  setPushOutcome(fn: (t: PushTarget) => PushResult): void;
   clock: { now: Date };
   close(): Promise<void>;
+}
+
+export interface PushCall {
+  target: PushTarget;
+  payload: PushPayload;
 }
 
 export async function createHarness(overrides: Partial<Record<string, string>> = {}, fetchImpl: typeof fetch = fetch): Promise<Harness> {
@@ -37,6 +45,8 @@ export async function createHarness(overrides: Partial<Record<string, string>> =
   const pools = { app: createPool(TEST_DB.app, { max: 5 }), system: createPool(TEST_DB.system, { max: 5 }) };
   const email = createEmailSender("memory", () => undefined, false);
   const clock = { now: new Date() };
+  const pushes: PushCall[] = [];
+  let pushOutcome: (t: PushTarget) => PushResult = () => ({ ok: true, status: 201 });
   const deps: AppDeps = { config, pools, logger: createLogger(process.env.TEST_LOG_LEVEL ?? "silent"), email, now: () => clock.now };
   const app = await buildApp(deps);
   const admin = new pg.Pool({ connectionString: TEST_DB.admin, max: 2 });
@@ -57,6 +67,16 @@ export async function createHarness(overrides: Partial<Record<string, string>> =
       policy: { allowPrivateNetworks: true, allowPublicNetworks: false, requireHttps: false, timeoutMs: 2000, maxRedirects: 3, maxResponseBytes: 64 * 1024, blockedHosts: ["localhost"] },
       loadSecrets: (await import("@tracker/worker")).createSubscriptionSecretLoader(process.env.CREDENTIALS_KEYS),
     },
+    // Notificações: e-mail em memória e push falso (registra o pedido). Entrega externa só quando o teste liga.
+    notifications: {
+      allowExternal: false,
+      email,
+      push: async (target, payload) => {
+        pushes.push({ target, payload });
+        return pushOutcome(target);
+      },
+      appUrl: "http://localhost:3000",
+    },
   };
   return {
     app,
@@ -64,6 +84,10 @@ export async function createHarness(overrides: Partial<Record<string, string>> =
     admin,
     worker,
     emails: email.sent!,
+    pushes,
+    setPushOutcome(fn: (t: PushTarget) => PushResult) {
+      pushOutcome = fn;
+    },
     clock,
     async close() {
       await app.close();

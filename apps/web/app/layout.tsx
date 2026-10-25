@@ -6,7 +6,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: BRAND.name, template: `%s · ${BRAND.name}` },
   description: BRAND.tagline,
-  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: BRAND.name, statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#1d5fd1" };

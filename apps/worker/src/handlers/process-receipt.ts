@@ -12,6 +12,7 @@ import {
   type ReversalState,
   type TransactionState,
 } from "@tracker/domain";
+import { notifySale } from "./notifications";
 import { queueWebhookEvent } from "./webhooks-out";
 
 /**
@@ -341,11 +342,19 @@ export async function processReceipt(c: PoolClient, orgId: string, receiptId: st
       [orgId, rec.project_id, receiptId, seq, ev.schemaVersion, ev.eventType, ev.occurredAt, orderId, JSON.stringify(sanitizedCanonical(ev))],
     );
     // Efeitos derivados via outbox (sem duplicar: dedup por chave semântica).
+    // A notificação da PRIMEIRA aprovação sai depois da atribuição (para mostrar a origem); as demais saem já.
+    const pendingSaleNotices = [...newlyApproved];
     if (totals.firstApprovedAt) {
-      await c.query(
-        "insert into public.outbox (organization_id, topic, payload, dedup_key, priority) values ($1, 'attribution.compute', $2, $3, 3) on conflict do nothing",
-        [orgId, JSON.stringify({ order_id: orderId }), `attr:${orderId}:${totals.firstApprovedAt.toISOString()}`],
+      const notifyTx = newlyApproved[0] ?? null;
+      const a = await c.query(
+        "insert into public.outbox (organization_id, topic, payload, dedup_key, priority) values ($1, 'attribution.compute', $2, $3, 3) on conflict do nothing returning id",
+        [orgId, JSON.stringify({ order_id: orderId, ...(notifyTx ? { notify_tx: notifyTx } : {}) }), `attr:${orderId}:${totals.firstApprovedAt.toISOString()}`],
       );
+      if (a.rows[0] && notifyTx) pendingSaleNotices.shift();
+    }
+    for (const txKey of pendingSaleNotices) await notifySale(c, orgId, { kind: "sale.approved", orderId, transactionKey: txKey }, now);
+    for (const l of ledger.filter((x) => x.type === "refund" || x.type === "chargeback")) {
+      await notifySale(c, orgId, { kind: l.type === "refund" ? "sale.refunded" : "sale.chargeback", orderId, ledgerKey: l.semanticKey }, now);
     }
     for (const txKey of newlyApproved) {
       newlyApprovedCount++;

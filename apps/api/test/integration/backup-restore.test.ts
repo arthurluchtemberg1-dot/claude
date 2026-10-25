@@ -133,7 +133,7 @@ describe("T69 backup e restauração", () => {
     const pools = { app: createPool(appRestored, { max: 2 }), system: createPool(sysRestored, { max: 2 }) };
     const app = await buildApp({ config, pools, logger: createLogger("silent"), email: createEmailSender("memory", () => undefined, false), now: () => new Date() });
     try {
-      const client = new Client({ app, deps: null as never, admin: null as never, worker: null as never, emails: [], clock: { now: new Date() }, close: async () => undefined });
+      const client = new Client({ app, deps: null as never, admin: null as never, worker: null as never, emails: [], pushes: [], setPushOutcome: () => undefined, clock: { now: new Date() }, close: async () => undefined });
       const login = await client.req("POST", "/v1/auth/login", { email: owner.email, password: owner.password });
       expect(login.statusCode, login.body).toBe(200);
       client.orgId = orgId;

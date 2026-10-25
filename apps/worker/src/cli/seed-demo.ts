@@ -70,6 +70,7 @@ const deps: WorkerDeps = {
   delivery: { environment: "demo", allowExternalDelivery: false, fetchImpl: fetch, loadSecret: createSecretLoader() },
   // Demonstração nunca envia nada para fora (T68): sem rede pública nem privada.
   outbound: { policy: { allowPrivateNetworks: false, allowPublicNetworks: false, requireHttps: true }, loadSecrets: createSubscriptionSecretLoader() },
+  notifications: { allowExternal: false, email: null, push: null, appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000" },
 };
 const processed = await drainOutbox(deps, { maxRounds: 50 });
 console.log(`Organização de demonstração criada (${orgId}); ${processed} itens processados. Selecione-a no painel.`);

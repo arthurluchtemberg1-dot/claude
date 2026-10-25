@@ -27,7 +27,8 @@
     "diag": "pnpm --filter @tracker/api diag",
     "traceability": "node scripts/check-traceability.mjs",
     "sdk:build": "pnpm --filter @tracker/tracker build",
-    "docs:metrics": "tsx scripts/gen-metrics-dictionary.ts"
+    "docs:metrics": "tsx scripts/gen-metrics-dictionary.ts",
+    "push:keys": "node scripts/push-keys.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -35,6 +36,7 @@
     "@types/pg": "8.23.1",
     "esbuild": "0.28.2",
     "eslint": "10.11.0",
+    "http_ece": "1.2.0",
     "pg": "8.23.0",
     "tsx": "4.23.15",
     "typescript": "5.9.3",

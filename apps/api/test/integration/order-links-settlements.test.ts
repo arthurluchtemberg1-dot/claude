@@ -230,7 +230,7 @@ describe("T18 parcelas, recebíveis e liquidações", () => {
 
     // Métricas "até agora": o relógio do harness avança para depois dos eventos enviados.
     h.clock.now = new Date(Date.now() + 1000);
-    const org = u2.client.json(await u2.client.req("GET", "/v1/org"));
+    const org = u2.client.json(await u2.client.req("GET", "/v1/org")).organization;
     const day = new Date().toLocaleDateString("sv-SE", { timeZone: org.timezone });
     for (const basis of ["approval", "financial_movement"]) {
       const s = u2.client.json(await u2.client.req("GET", `/v1/metrics/summary?from=${day}&to=${day}&basis=${basis}`));
