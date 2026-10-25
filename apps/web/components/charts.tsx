@@ -54,7 +54,9 @@ export function BarLineChart({ labels, series, format, title }: { labels: string
           </span>
         ))}
       </figcaption>
-      <table className="sr-only">
+      {/* Tabela acessível: o contêiner é que fica oculto (uma <table> não encolhe e alargaria a página no celular). */}
+      <div className="sr-only">
+      <table>
         <caption>{title}</caption>
         <thead>
           <tr>
@@ -75,6 +77,7 @@ export function BarLineChart({ labels, series, format, title }: { labels: string
           ))}
         </tbody>
       </table>
+      </div>
     </figure>
   );
 }

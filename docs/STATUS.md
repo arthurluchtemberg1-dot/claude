@@ -1,6 +1,6 @@
 # STATUS
 
-Última atualização: 24/09/2026 (sessão 2). Branch: `claude/blissful-hypatia-9ji33p`.
+Última atualização: 25/10/2026 (sessão 3). Branch: `claude/blissful-hypatia-9ji33p`.
 
 ## Resumo
 
@@ -10,35 +10,57 @@
 - **E3/E4: parcialmente adiantadas** sem acesso externo: custos manuais, importação CSV de gasto (com entidades e histórico de nomes), tabelas de taxas, serviço de métricas com bases temporais, detalhamento por campanha/conjunto/anúncio/rede com junção por ID (tela Campanhas, somente leitura), destino Meta CAPI completo (envio real desligado), parser de insights Meta.
 - **E8 (parcial): API pública v1 e webhooks de saída implementados** — chaves com escopos/projetos/sandbox, limites, Idempotency-Key, OpenAPI, webhooks assinados com anti-SSRF, fila de falhas e proteção contra loops.
 - **E9 (parcial): implantação em contêineres verificada** — imagens api/worker/web, compose de referência executado ponta a ponta, backup/restauração verificados (T69), SMTP com TLS.
-- **E5–E7, E10:** planejadas (catálogo completo com estados reais, sem stubs).
+- **E6 (parcial, sessão 3): motor de regras e Gestor IA implementados** — regras com simulação, versões imutáveis, travas e execução agendada (notificar, webhook, tag; ações na rede só simulam até DEP-META-APP); Gestor IA com ferramentas tipadas somente leitura, limites e auditoria (adaptador Anthropic; uso real depende de chave — DEP-AI).
+- **E8 (parcial, sessão 3): central de notificações** — venda aprovada/renovação/upsell, reembolso, chargeback e alertas operacionais no painel, e-mail e Web Push, com preferências, horário silencioso e som de venda opcional.
+- **E9 (parcial, sessão 3): PWA instalável** — manifesto, ícones, service worker e revisão em tela de celular das telas principais.
+- **E5, E7, E10:** planejadas (catálogo completo com estados reais, sem stubs).
 
-Matriz: 223 requisitos implementados localmente, 75 parciais, 12 bloqueados externamente, 113 planejados, 13 de método/documento. Cenários T01–T70: 56 automatizados e executados, 2 parciais, 11 planejados, 1 bloqueado (ver [`REQUIREMENTS_TRACEABILITY.md`](REQUIREMENTS_TRACEABILITY.md)).
+### Paridade funcional com LowTrack/UTMify (categorias públicas, implementação própria)
+
+| Categoria | Situação |
+| --- | --- |
+| SDK, passagem de origem, atribuição, deduplicação CAPI | Implementado localmente; Meta CAPI com envio real desligado até DEP-META-APP |
+| Painel, vendas, campanhas, clientes, custos | Implementado (gasto por importação CSV; sincronização Meta bloqueada) |
+| Notificação de venda no celular (push + som) | Implementado (Web Push/PWA; app nativo nas lojas planejado — DEP-STORES) |
+| Alertas (integração parada, fila, falhas, metas, gasto sem venda) | Implementado (monitores + regras) |
+| Regras automáticas | Implementado com simulação; pausar/ativar/orçamento/duplicar na rede dependem de DEP-META-APP |
+| Gestor IA | Implementado com provedor Anthropic; requer chave (DEP-AI) |
+| Alerta de saldo, criação rápida e duplicação de campanhas | Bloqueado por DEP-META-APP (gestão via API Meta) |
+| API pública e webhook de saída | Implementado |
+
+Matriz: 241 requisitos implementados localmente, 87 parciais, 12 bloqueados externamente, 83 planejados, 13 de método/documento. Cenários T01–T70 conforme [`REQUIREMENTS_TRACEABILITY.md`](REQUIREMENTS_TRACEABILITY.md).
 
 ## Evidências (executadas nesta sessão)
 
 | Verificação | Comando | Resultado |
 | --- | --- | --- |
 | Lint | `pnpm lint` | sem erros |
-| Tipos | `pnpm typecheck` | sem erros (8 pacotes; conferir o código de saída — `pnpm -s` omite a saída do erro) |
-| Unitários + integração (PostgreSQL 16 e Redis 7 reais) | `pnpm test` | 213 testes passando (21 arquivos) |
-| E2E navegador (API + worker/BullMQ + painel, banco `tracker_e2e`) | `pnpm test:e2e` | 3 testes passando, incluindo T70 (com Campanhas, Clientes, Atribuição e criação/uso/revogação de chave de API) |
+| Tipos | `pnpm typecheck` | sem erros (10 pacotes; conferir o código de saída — `pnpm -s` omite a saída do erro) |
+| Unitários + integração (PostgreSQL 16 e Redis 7 reais) | `pnpm test` | 263 testes passando (28 arquivos; 4 de desempenho opcionais com `PERF=1`) |
+| E2E navegador (API + worker/BullMQ + painel, banco `tracker_e2e`) | `pnpm test:e2e` | 3 testes passando, incluindo T70 (Campanhas, Clientes, Atribuição, chave de API, sino/central de notificações, manifesto e service worker, meta criada por exemplo → simulada → ativada, Gestor IA indisponível sem provedor) |
+| Web Push | `packages/connectors/test/web-push.test.ts` | mensagem cifrada (aes128gcm) decifrada com a chave do "navegador"; VAPID; 404/410 desativam a inscrição; anti-SSRF |
+| Adaptador Anthropic | `packages/ai/test/anthropic-adapter.test.ts` | pedido do SDK oficial conferido contra servidor local que imita a API (ferramentas estritas, cache, esforço, fallback por recusa); nenhuma chamada real |
+| Celular | revisão visual a 390 px | sem estouro de layout em painel, vendas, notificações, automação, Gestor IA e campanhas |
 | Contêineres | `docker build --target api` (e `worker`, `web`) + `node deploy/compose-smoke.mjs` | imagens construídas; pilha completa (PostgreSQL, Redis, migrações, API, worker, painel) com cadastro → webhook → worker → pedido aprovado |
 | Backup/restauração | `backup-restore.test.ts` (scripts reais com pg_dump/pg_restore) | restauração verificada em banco novo; dump sem segredos/chaves; login e webhook funcionando no banco restaurado |
 | Carga | `node scripts/load-test.mjs --orders 2000 --concurrency 32` | webhooks ~320 req/s (p95 ~130 ms, 0 erros), ~170–190 pedidos/s ponta a ponta por réplica de worker, idempotência preservada, coleta ~625 req/s, resumo p95 579 ms logo após a carga (antes: 32 s) — `docs/load-tests/` |
 | Build | `pnpm build` | API/worker empacotados (executados com `/health` e `/ready` OK), painel Next standalone, SDK 4,3 KiB gzip |
 | Fixture financeira obrigatória | domínio e via webhooks + API | valores exatos com webhooks repetidos 3× |
 
+Sessão 3 (defeitos reais encontrados): teste de recebíveis calculava o dia em UTC (falhava à noite no horário de Brasília); ação de regra que falhava "prendia" a chave de idempotência e não era tentada de novo (circuit breaker nunca disparava); a tabela acessível do gráfico do painel alargava a página no celular e o painel do sino abria fora da tela.
+
 Defeitos reais encontrados e corrigidos pelos testes: corrida relay→worker (job antes do commit), token do SDK exposto em UTM, origem declarada competindo com vínculo por token, desvio de relógio do checkout, isolamento de tentativas de login entre execuções de teste. Sessão 2: importação CSV por campanha com nomes falhava por falta de permissão de escrita em `ad_entity_names`; nível de gasto escolhido por conta no período inteiro descartava dias importados em outro nível; toques do SDK não extraíam IDs "nome|id" das UTMs (vendas atribuídas por token ficavam sem campanha); restrição de membro a projeto inexistente gerava erro 500; rotas respondiam antes do COMMIT (`reply.send` dentro da transação — causa das falhas intermitentes; D-022); opções SMTP ignoradas pelo nodemailer (TLS não exigido) — corrigido antes de ir a produção; base por aprovação levava renovações ao mês da primeira compra e as creditava à campanha de aquisição (D-027); resumo de métricas com p95 de 32 s sob carga (consulta O(n²) e estatísticas desatualizadas; D-028).
 
 ## Entregue por módulo
 
 - **Domínio** (`packages/domain`): dinheiro exato, fuso/intervalos, agregado financeiro (pendente/aprovado/falho, reversões sem dupla dedução, disputa ganha, estorno antes da aprovação, renovação, participação da organização, parcelas informativas), registro de 25 métricas com qualidade/indefinido/indisponível, 7 modelos de atribuição, UTMs/macros, sanitização, permissões.
-- **Banco**: 15 migrações (0012 upsell/recebíveis, 0013 entidades/nomes por data, 0014 API pública/webhooks de saída, 0015 clientes); RLS em todas as tabelas de negócio; FKs compostas; razão somente leitura para a API; cofre de credenciais cifrado.
+- **Banco**: 19 migrações (0012 upsell/recebíveis, 0013 entidades/nomes por data, 0014 API pública/webhooks de saída, 0015 clientes, 0016 autovacuum, 0017 notificações, 0018 regras, 0019 Gestor IA); RLS em todas as tabelas de negócio; FKs compostas; razão somente leitura para a API; cofre de credenciais cifrado.
 - **API**: auth (cadastro, verificação, login, bloqueio, reset, MFA, sessões), organizações/membros/convites/projetos/auditoria, conexões e endpoints (URL exibida uma vez, rotação/revogação), ingestão de webhooks e coleta do SDK, vendas (lista/detalhe com pedidos vinculados e recebíveis/manual/exportação CSV), métricas (resumo/série), detalhamento por campanha/conjunto/anúncio/rede, API pública `/public/v1` (OpenAPI) e gestão de chaves/webhooks de saída, políticas de atribuição (versões, comparação, recálculo), clientes, diagnóstico, destinos, custos/importação, UTMs, health/ready.
 - **Worker**: relay, consumidor BullMQ, processamento de recebimentos (vínculo de upsell com resolução adiada, recebíveis/liquidações), atribuição versionada (herança do vínculo do pedido original), emissão e entrega de webhooks de saída, fanout e envio Meta CAPI com retry/circuit breaker, seed de demonstração.
 - **Painel**: entrada/onboarding, visão geral, vendas e detalhe (pedidos vinculados, parcelas, recebíveis), campanhas (detalhamento e drill-down), clientes, atribuição (políticas e comparação; seletor no painel), API e webhooks, integrações e catálogo, instalação do SDK, UTMs, pixels, custos, diagnóstico, configurações; módulos futuros identificados como planejados.
 - **SDK**: consentimento, identificadores, toques, lotes/beacon, SPA, decoração de checkout, token, iframe.
-- **Ferramentas**: `pnpm diag`, `pnpm webhook:simulate`, `pnpm db:seed:demo`, `pnpm traceability`, `pnpm docs:metrics`.
+- **Sessão 3**: `packages/analytics` (métricas e detalhamento compartilhados por API e worker), `packages/ai` (provedores, ferramentas e laço do Gestor IA), notificações (`apps/worker/src/handlers/notifications.ts`, `monitors.ts`, agendador), regras (`packages/domain/src/rules`, `apps/worker/src/handlers/rules.ts`), telas `/notificacoes`, `/automacao`, `/gestor-ia`; migrações 0017–0019.
+- **Ferramentas**: `pnpm push:keys` (chaves VAPID), `pnpm diag`, `pnpm webhook:simulate`, `pnpm db:seed:demo`, `pnpm traceability`, `pnpm docs:metrics`.
 
 ## Limitações conhecidas (não esconder)
 
@@ -49,7 +71,10 @@ Defeitos reais encontrados e corrigidos pelos testes: corrida relay→worker (jo
 - Métricas por movimento financeiro ainda não exibem repasses/recebíveis (tabela disponível para conciliação).
 - API pública ainda sem leads/eventos próprios; limite de taxa em janelas no banco (D-020).
 - Hospedagem real, domínio/TLS, agendamento de backups e observabilidade externa dependem do operador (DEP-HOSTING, DEP-OBSERVABILITY); e-mail real depende de conta SMTP (DEP-EMAIL).
-- Sem notificações, regras, IA, WhatsApp/CRM, funis, relatórios agendados, cobrança do SaaS, app nativo.
+- Regras não executam ações na rede de anúncios (pausar, ativar, orçamento, duplicar): só simulam até existir conector de gestão Meta. Status de aprendizagem aproximado pela idade desde o primeiro gasto.
+- Gestor IA: só o adaptador Anthropic existe (OpenAI/Google planejados por falta de documentação verificada); resumo diário programado pendente; o comportamento do modelo (separar fato e hipótese, resistir a injeção) é instruído, não garantido por código.
+- Push depende do navegador/serviço de push (não garantido); no iPhone exige instalar o PWA. Monitor de fila roda no próprio worker (worker parado é detectado pelo `/ready`, não por notificação).
+- Sem WhatsApp/CRM, funis, relatórios agendados, cobrança do SaaS, app nativo nas lojas.
 - Warnings do React ("unique key") emitidos pelo próprio Next 16.3.6 durante o build/start; não afetam funcionamento.
 
 ## Impedimentos externos
@@ -62,7 +87,8 @@ Ver [`EXTERNAL_DEPENDENCIES.md`](EXTERNAL_DEPENDENCIES.md). Os que mais destrava
 ## Próximo passo executável
 
 1. Contribuição por pedido/cliente com custos variáveis alocados e consolidação multimoeda com câmbio (R22-10).
-2. Alertas e notificações (seção 34) e relatórios agendados/exportações (seção 32).
-3. Após DEP-META-APP: OAuth Meta (state + PKCE), sincronização de contas/entidades/insights com paginação e backfill, validação CAPI com `test_event_code`.
+2. Relatórios agendados/exportações (seção 32) e resumo diário do Gestor IA (R27-03).
+3. Revisão visual em celular das telas restantes (diagnóstico, integrações, detalhe de venda) — R35-01.
+4. Após DEP-META-APP: OAuth Meta (state + PKCE), sincronização de contas/entidades/insights com paginação e backfill, saldo da conta (alerta), validação CAPI com `test_event_code`, e então ações de gestão (pausar/orçamento/duplicar) para as regras.
 
-Para retomar: ler `CLAUDE.md`, este arquivo e a matriz; subir PostgreSQL/Redis (`service postgresql start`; `redis-server --daemonize yes --appendonly yes --dir /tmp`); `pnpm install && pnpm db:migrate && pnpm test`.
+Para retomar: ler `CLAUDE.md`, este arquivo e a matriz; subir PostgreSQL/Redis (`service postgresql start`; `redis-server --daemonize yes --appendonly yes --dir /tmp`); em contêiner novo, criar `.env` a partir de `.env.example` (senhas locais do `db-setup`) e rodar `pnpm db:setup`; depois `pnpm install && pnpm db:migrate && pnpm test`.

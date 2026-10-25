@@ -89,7 +89,7 @@ function MetricCard({ m, prev, onOpen }: { m: Metric; prev?: Metric; onOpen: () 
   const d = delta(m, prev);
   return (
     <button type="button" onClick={onOpen} className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-3 text-left hover:border-primary" aria-label={`${m.label}: ${display(m)}. Abrir definição`}>
-      <span className="flex items-center justify-between gap-2 text-xs text-muted">
+      <span className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs text-muted">
         {m.label}
         {q === "partial" && <Badge tone="warn">parcial</Badge>}
         {q === "estimated" && <Badge tone="info">estimado</Badge>}

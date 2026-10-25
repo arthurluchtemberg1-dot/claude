@@ -193,6 +193,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               })}
             </ul>
           </nav>
+          {/* Em telas pequenas o tema fica no menu lateral (cabeçalho em uma linha). */}
+          <div className="border-t border-border p-2 sm:hidden">
+            <ThemeToggle />
+          </div>
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2">
@@ -207,7 +211,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   setOrgId(e.target.value);
                   window.location.href = "/painel";
                 }}
-                className="w-auto max-w-[16rem] py-1"
+                className="w-auto max-w-[10rem] py-1 sm:max-w-[16rem]"
               >
                 {value.me.organizations.map((o) => (
                   <option key={o.id} value={o.id}>
@@ -223,7 +227,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               {!value.me.user.email_verified && <Badge tone="warn">E-mail não verificado</Badge>}
               <NotificationsBell timezone={value.org.organization.timezone} />
               <span className="hidden text-muted sm:inline">{value.me.user.display_name}</span>
-              <ThemeToggle />
+              <div className="hidden sm:block">
+                <ThemeToggle />
+              </div>
               <Button variant="secondary" onClick={logout}>
                 Sair
               </Button>

@@ -3253,10 +3253,10 @@
     },
     {
       "status": "partial",
-      "impl": "Manifesto via app/manifest.ts (marca configurável), ícones PNG 192/512/maskable, service worker (push, clique, página sem conexão sem ações), layout responsivo",
-      "tests": "E2E T70 (manifesto, sw.js sem cache, registro do service worker)",
+      "impl": "Manifesto (marca configurável), ícones PNG 192/512/maskable, service worker (push, clique, página sem conexão sem ações); cabeçalho em uma linha e painel do sino ajustados ao celular; tabela acessível do gráfico não alarga mais a página",
+      "tests": "E2E T70 (manifesto, sw.js, registro do service worker); revisão visual a 390 px (painel, vendas, notificações, automação, Gestor IA, campanhas) sem estouro de layout",
       "dep": "",
-      "note": "Revisão visual em telas pequenas das telas principais pendente",
+      "note": "Diagnóstico e demais telas ainda sem revisão visual em celular",
       "id": "R35-01",
       "stage": "E9"
     },

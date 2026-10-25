@@ -61,7 +61,7 @@ export function NotificationsBell({ timezone }: { timezone: string }) {
         )}
       </Button>
       {open && (
-        <div role="dialog" aria-label="Notificações recentes" className="absolute right-0 z-50 mt-2 w-[min(92vw,24rem)] rounded-lg border border-border bg-surface shadow-lg">
+        <div role="dialog" aria-label="Notificações recentes" className="fixed inset-x-2 top-14 z-50 rounded-lg border border-border bg-surface shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[24rem]">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <span className="text-sm font-semibold">Notificações</span>
             {feed.unread > 0 && (
@@ -83,7 +83,7 @@ export function NotificationsBell({ timezone }: { timezone: string }) {
                   }}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium">{n.title}</span>
+                    <span className="min-w-0 truncate text-sm font-medium">{n.title}</span>
                     <Badge tone={TONE[n.severity]}>{n.label}</Badge>
                   </div>
                   {n.body && <div className="truncate text-xs text-muted">{n.body}</div>}
