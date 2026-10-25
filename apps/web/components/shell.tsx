@@ -33,29 +33,92 @@ export function useSession(): SessionValue {
   return v;
 }
 
-/** Navegação: módulos não implementados aparecem identificados como planejados (R39-01). */
-const NAV: { href: string; label: string; status?: "planned" }[] = [
-  { href: "/painel", label: "Visão geral" },
-  { href: "/vendas", label: "Vendas" },
-  { href: "/campanhas", label: "Campanhas" },
-  { href: "/clientes", label: "Clientes" },
-  { href: "/atribuicao", label: "Atribuição" },
-  { href: "/integracoes", label: "Integrações" },
-  { href: "/instalacao", label: "Instalação do SDK" },
-  { href: "/origem", label: "Origem e UTMs" },
-  { href: "/pixels", label: "Pixels e conversões" },
-  { href: "/custos", label: "Custos e mídia" },
-  { href: "/diagnostico", label: "Diagnóstico" },
-  { href: "/configuracoes", label: "Configurações" },
-  { href: "/api-webhooks", label: "API e webhooks" },
-  { href: "/notificacoes", label: "Notificações" },
-  { href: "/automacao", label: "Automação" },
-  { href: "/gestor-ia", label: "Gestor IA" },
-  { href: "/modulos/whatsapp-crm", label: "WhatsApp e CRM", status: "planned" },
-  { href: "/modulos/funis", label: "Funis e testes", status: "planned" },
-  { href: "/modulos/relatorios", label: "Relatórios", status: "planned" },
-  { href: "/modulos/assinatura", label: "Assinatura", status: "planned" },
+/** Navegação em seções; módulos não implementados aparecem identificados como planejados (R39-01). */
+type NavItem = { href: string; label: string; icon: keyof typeof ICONS; status?: "planned" };
+const NAV: { section: string; items: NavItem[] }[] = [
+  {
+    section: "Principal",
+    items: [
+      { href: "/primeiros-passos", label: "Primeiros passos", icon: "flag" },
+      { href: "/painel", label: "Visão geral", icon: "home" },
+      { href: "/campanhas", label: "Campanhas", icon: "target" },
+      { href: "/vendas", label: "Vendas", icon: "cart" },
+      { href: "/clientes", label: "Clientes", icon: "users" },
+    ],
+  },
+  {
+    section: "Automação",
+    items: [
+      { href: "/automacao", label: "Regras", icon: "bolt" },
+      { href: "/gestor-ia", label: "Gestor IA", icon: "spark" },
+      { href: "/notificacoes", label: "Notificações", icon: "bell" },
+    ],
+  },
+  {
+    section: "Rastreamento",
+    items: [
+      { href: "/integracoes/meta", label: "Meta Ads", icon: "meta" },
+      { href: "/integracoes", label: "Integrações", icon: "plug" },
+      { href: "/instalacao", label: "Instalação do SDK", icon: "code" },
+      { href: "/origem", label: "Origem e UTMs", icon: "link" },
+      { href: "/pixels", label: "Pixels e conversões", icon: "pixel" },
+      { href: "/atribuicao", label: "Atribuição", icon: "split" },
+    ],
+  },
+  {
+    section: "Gestão",
+    items: [
+      { href: "/custos", label: "Custos e mídia", icon: "coin" },
+      { href: "/diagnostico", label: "Diagnóstico", icon: "pulse" },
+      { href: "/api-webhooks", label: "API e webhooks", icon: "hook" },
+      { href: "/configuracoes", label: "Configurações", icon: "gear" },
+    ],
+  },
+  {
+    section: "Em breve",
+    items: [
+      { href: "/modulos/whatsapp-crm", label: "WhatsApp e CRM", icon: "chat", status: "planned" },
+      { href: "/modulos/funis", label: "Funis e testes", icon: "funnel", status: "planned" },
+      { href: "/modulos/relatorios", label: "Relatórios", icon: "doc", status: "planned" },
+      { href: "/modulos/assinatura", label: "Assinatura", icon: "card", status: "planned" },
+    ],
+  },
 ];
+const ALL_HREFS = NAV.flatMap((g) => g.items.map((i) => i.href));
+
+/** Ícones de traço simples (desenho próprio), 24×24. */
+const ICONS = {
+  flag: "M5 21V4m0 0h11l-2 4 2 4H5",
+  home: "M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
+  target: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zm0-5a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0-3.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z",
+  cart: "M3 4h2l2.4 11h10.2L20 8H6.2M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm8 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2z",
+  users: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1m2-10a3 3 0 1 0 0-6m2 16v-1a5 5 0 0 0-3-4.6",
+  bolt: "M13 2L4 14h7l-1 8 9-12h-7z",
+  spark: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z",
+  bell: "M6 16V11a6 6 0 1 1 12 0v5l2 2H4zm4 4a2 2 0 0 0 4 0",
+  meta: "M3 15c0-5 2.5-8 4.5-8 3 0 5.5 10 9 10 2 0 4.5-2 4.5-5s-2-5-4-5c-3.5 0-6 10-9.5 10C5 17 3 16.5 3 15z",
+  plug: "M9 2v5m6-5v5M6 7h12v4a6 6 0 0 1-12 0zm6 10v5",
+  code: "M8 8l-5 4 5 4m8-8l5 4-5 4M14 4l-4 16",
+  link: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1m-2 7.4l-1 1a4 4 0 0 1-5.7-5.7l3-3a4 4 0 0 1 5.7 0",
+  pixel: "M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 3h6m-3-3v6",
+  split: "M6 3v6a6 6 0 0 0 6 6h0a6 6 0 0 1 6 6M18 3v6a6 6 0 0 1-3 5.2M3 6l3-3 3 3m6 0l3-3 3 3",
+  coin: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zm3-12.5c-.6-.9-1.7-1.5-3-1.5-1.9 0-3 1-3 2.3 0 3.2 6 1.7 6 4.9 0 1.3-1.3 2.3-3 2.3-1.4 0-2.5-.6-3.1-1.6M12 5v2m0 10v2",
+  pulse: "M3 12h4l3-8 4 16 3-8h4",
+  hook: "M7 15a4 4 0 1 0 4 4m6-4a4 4 0 1 1-4 4H9m3-14a4 4 0 0 1 2 7.5L17 15",
+  gear: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm7.4-3a7.4 7.4 0 0 0-.1-1.3l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-2.2-1.3L14.4 3h-4l-.4 2.4a7.4 7.4 0 0 0-2.2 1.3l-2.4-1-2 3.4 2 1.6a7.4 7.4 0 0 0 0 2.6l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 2.2 1.3l.4 2.4h4l.4-2.4a7.4 7.4 0 0 0 2.2-1.3l2.4 1 2-3.4-2-1.6c.1-.4.1-.9.1-1.3z",
+  chat: "M4 5h16v11H8l-4 4z",
+  funnel: "M3 4h18l-7 8v7l-4 2v-9z",
+  doc: "M6 2h9l5 5v15H6zm8 0v6h6M9 13h8M9 17h8",
+  card: "M3 6h18v12H3zm0 4h18M7 15h4",
+} as const;
+
+function NavIcon({ name }: { name: keyof typeof ICONS }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={ICONS[name]} />
+    </svg>
+  );
+}
 
 function ThemeToggle() {
   const [theme, setTheme] = useState<string>("system");
@@ -172,26 +235,37 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Button>
           </div>
           <nav className="flex-1 overflow-y-auto p-2">
-            <ul className="space-y-0.5">
-              {NAV.map((n) => {
-                const active = pathname === n.href || pathname.startsWith(n.href + "/");
-                return (
-                  <li key={n.href}>
-                    <Link
-                      href={n.href}
-                      onClick={() => setMenuOpen(false)}
-                      aria-current={active ? "page" : undefined}
-                      title={n.label}
-                      className={cx("flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm", active ? "bg-surface-2 font-semibold" : "text-muted hover:bg-surface-2 hover:text-text")}
-                    >
-                      <span className={cx(collapsed && "sr-only")}>{n.label}</span>
-                      {collapsed && <span aria-hidden>{n.label.slice(0, 2)}</span>}
-                      {!collapsed && n.status === "planned" && <Badge>planejado</Badge>}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            {NAV.map((g) => (
+              <div key={g.section} className="mb-3">
+                {!collapsed && <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">{g.section}</p>}
+                <ul className="space-y-0.5">
+                  {g.items.map((n) => {
+                    // Item mais específico vence (ex.: /integracoes/meta não acende /integracoes).
+                    const matches = (h: string) => pathname === h || pathname.startsWith(h + "/");
+                    const active = matches(n.href) && !ALL_HREFS.some((h) => h !== n.href && h.startsWith(n.href + "/") && matches(h));
+                    return (
+                      <li key={n.href}>
+                        <Link
+                          href={n.href}
+                          onClick={() => setMenuOpen(false)}
+                          aria-current={active ? "page" : undefined}
+                          title={n.label}
+                          className={cx(
+                            "flex items-center gap-2 rounded-md px-3 py-2 text-sm",
+                            collapsed && "justify-center px-2",
+                            active ? "bg-primary/10 font-semibold text-primary" : "text-muted hover:bg-surface-2 hover:text-text",
+                          )}
+                        >
+                          <NavIcon name={n.icon} />
+                          <span className={cx("flex-1", collapsed && "sr-only")}>{n.label}</span>
+                          {!collapsed && n.status === "planned" && <Badge>planejado</Badge>}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
           </nav>
           {/* Em telas pequenas o tema fica no menu lateral (cabeçalho em uma linha). */}
           <div className="border-t border-border p-2 sm:hidden">

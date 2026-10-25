@@ -167,7 +167,7 @@ test("T70 jornada completa: cadastro → conexão Lowify → visita com SDK → 
   await recent.getByRole("link", { name: "Ver todas e preferências" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Notificações" })).toBeVisible();
   await expect(page.getByTestId("notifications-list").getByText(/Venda aprovada · R\$\s199,90/)).toBeVisible();
-  await expect(page.getByText("Saldo baixo na conta de anúncios")).toBeVisible();
+  await expect(page.getByText("Limite de gasto da conta perto do fim")).toBeVisible();
   await page.getByRole("button", { name: "Marcar todas como lidas" }).first().click();
   await expect(page.getByTestId("notifications-unread")).toHaveCount(0);
   // PWA: manifesto com ícones instaláveis e service worker servido sem cache.
