@@ -1,3 +1,4 @@
+import { runAiQuestion, type AiRunDeps } from "@tracker/ai";
 import { withTx, type Pool, type PoolClient } from "@tracker/db";
 import { computeAttribution } from "./handlers/attribution";
 import { fanoutDestinations, sendDelivery, type DeliveryDeps } from "./handlers/deliveries";
@@ -20,6 +21,7 @@ export interface WorkerDeps {
   outbound: OutboundDeps;
   notifications: NotificationDeps;
   rules: RuleRunDeps;
+  ai: AiRunDeps;
   now: () => Date;
   log: (obj: Record<string, unknown>, msg: string) => void;
 }
@@ -64,7 +66,7 @@ export async function dispatchOutboxItem(deps: WorkerDeps, orgId: string, outbox
       if (!item) return { skip: true as const };
       if (item.status === "done" || item.status === "dead") return { skip: true as const };
       const now = deps.now();
-      if (item.topic === "delivery.send" || item.topic === "webhooks.deliver" || item.topic === "notifications.deliver") return { external: true as const, topic: item.topic as string, payload: item.payload };
+      if (item.topic === "delivery.send" || item.topic === "webhooks.deliver" || item.topic === "notifications.deliver" || item.topic === "ai.run") return { external: true as const, topic: item.topic as string, payload: item.payload };
       await runInternal(c, deps, orgId, item.topic, item.payload, now);
       await c.query("update public.outbox set status = 'done', completed_at = now(), last_error = null where id = $1", [outboxId]);
       return { done: true as const };
@@ -75,6 +77,7 @@ export async function dispatchOutboxItem(deps: WorkerDeps, orgId: string, outbox
     const runTx = <T>(fn: (c: PoolClient) => Promise<T>) => withTx(pool, { organizationId: orgId }, fn);
     if (topic.topic === "webhooks.deliver") await deliverWebhook(runTx, deps.outbound, orgId, topic.payload.delivery_id, deps.now());
     else if (topic.topic === "notifications.deliver") await deliverNotification(runTx, deps.notifications, orgId, topic.payload.delivery_id, deps.now());
+    else if (topic.topic === "ai.run") await runAiQuestion(runTx, deps.ai, orgId, topic.payload.conversation_id, deps.now);
     else await sendDelivery(runTx, deps.delivery, orgId, topic.payload.delivery_id, deps.now());
     await withTx(pool, { organizationId: orgId }, (c) => c.query("update public.outbox set status = 'done', completed_at = now() where id = $1", [outboxId]));
     return "done";

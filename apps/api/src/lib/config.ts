@@ -1,3 +1,4 @@
+import { aiConfigFromEnv, type AiEnvConfig } from "@tracker/ai";
 import { outboundPolicyFromEnv, pushHostsFromEnv, vapidFromEnv, type SafeHttpPolicy, type VapidConfig } from "@tracker/connectors";
 import { z } from "zod";
 
@@ -60,6 +61,8 @@ export type AppConfig = z.infer<typeof schema> & {
   outboundPolicy: SafeHttpPolicy;
   /** Web Push: chave pública VAPID exposta ao navegador; null = push não configurado. */
   webPush: { publicKey: string; allowedHosts: string[] } | null;
+  /** Provedor de IA do ambiente (a chave nunca sai do servidor). */
+  ai: AiEnvConfig;
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -90,6 +93,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     mfaRequiredDefault: c.MFA_REQUIRED_DEFAULT ?? c.APP_ENV === "production",
     outboundPolicy: outboundPolicyFromEnv(env),
     webPush: webPushFrom(env),
+    ai: aiConfigFromEnv(env),
   };
 }
 

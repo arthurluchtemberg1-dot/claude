@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
+import type { AiProvider, AiTurnParams, AiTurnResult } from "@tracker/ai";
 import type { PushPayload, PushResult, PushTarget } from "@tracker/connectors";
 import { createPool } from "@tracker/db";
 import { drainOutbox, type WorkerDeps } from "@tracker/worker";
@@ -20,9 +21,14 @@ export interface Harness {
   emails: EmailMessage[];
   pushes: PushCall[];
   setPushOutcome(fn: (t: PushTarget) => PushResult): void;
+  /** IA falsa: cada rodada chama o roteiro do teste (nenhuma chamada real a provedores). null = sem provedor. */
+  setAi(handler: AiHandler | null): void;
+  aiCalls: AiTurnParams[];
   clock: { now: Date };
   close(): Promise<void>;
 }
+
+export type AiHandler = (p: AiTurnParams, round: number) => AiTurnResult | Promise<AiTurnResult>;
 
 export interface PushCall {
   target: PushTarget;
@@ -47,6 +53,21 @@ export async function createHarness(overrides: Partial<Record<string, string>> =
   const clock = { now: new Date() };
   const pushes: PushCall[] = [];
   let pushOutcome: (t: PushTarget) => PushResult = () => ({ ok: true, status: 201 });
+  const aiCalls: AiTurnParams[] = [];
+  let aiHandler: AiHandler | null = null;
+  let aiRound = 0;
+  const fakeAi: AiProvider = {
+    id: "anthropic",
+    model: "modelo-de-teste",
+    async turn(p) {
+      // Cópia do histórico: o laço continua anexando ao mesmo array depois desta rodada.
+      aiCalls.push({ ...p, transcript: structuredClone(p.transcript) });
+      return aiHandler!(p, aiRound++);
+    },
+    userEntry: (text) => ({ role: "user", content: text }),
+    toolResultsEntry: (results) => ({ role: "user", content: results.map((r) => ({ type: "tool_result", tool_use_id: r.id, content: r.content, ...(r.isError ? { is_error: true } : {}) })) }),
+    check: async () => ({ ok: true, model: "modelo-de-teste", displayName: null }),
+  };
   const deps: AppDeps = { config, pools, logger: createLogger(process.env.TEST_LOG_LEVEL ?? "silent"), email, now: () => clock.now };
   const app = await buildApp(deps);
   const admin = new pg.Pool({ connectionString: TEST_DB.admin, max: 2 });
@@ -78,6 +99,7 @@ export async function createHarness(overrides: Partial<Record<string, string>> =
       appUrl: "http://localhost:3000",
     },
     rules: { systemKillSwitch: false },
+    ai: { getProvider: async () => (aiHandler ? { provider: fakeAi } : { unavailable: "Nenhum provedor de IA configurado" }) },
   };
   return {
     app,
@@ -89,6 +111,11 @@ export async function createHarness(overrides: Partial<Record<string, string>> =
     setPushOutcome(fn: (t: PushTarget) => PushResult) {
       pushOutcome = fn;
     },
+    setAi(handler: AiHandler | null) {
+      aiHandler = handler;
+      aiRound = 0;
+    },
+    aiCalls,
     clock,
     async close() {
       await app.close();

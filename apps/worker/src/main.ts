@@ -4,6 +4,7 @@ import { Redis } from "ioredis";
 import pino from "pino";
 import { createPool, requireEnv } from "@tracker/db";
 import { dispatchOutboxItem, type WorkerDeps } from "./dispatch";
+import { aiConfigFromEnv, buildProvider, isAiProviderId } from "@tracker/ai";
 import { createEmailSender, createPushSender, outboundPolicyFromEnv, pushHostsFromEnv, vapidFromEnv } from "@tracker/connectors";
 import { createSecretLoader, createSubscriptionSecretLoader } from "./secrets";
 import { OUTBOX_QUEUE, relayOnce } from "./relay";
@@ -31,6 +32,9 @@ const email = createEmailSender(
   process.env.SMTP_URL ? { url: process.env.SMTP_URL, from: process.env.EMAIL_FROM ?? "Tracker <no-reply@example.com>" } : undefined,
 );
 
+const aiEnv = aiConfigFromEnv(process.env);
+const loadSecret = createSecretLoader();
+
 const deps: WorkerDeps = {
   pools: { system },
   tokenHmacKey: Buffer.from(requireEnv("TOKEN_HMAC_SECRET"), "base64"),
@@ -50,6 +54,15 @@ const deps: WorkerDeps = {
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   },
   rules: { systemKillSwitch: process.env.RULES_KILL_SWITCH === "true" },
+  ai: {
+    // Chave própria da organização (cofre) tem prioridade sobre a do ambiente.
+    getProvider: async (c, orgId) => {
+      const s = (await c.query("select settings->'ai' as ai from public.organizations where id = $1", [orgId])).rows[0]?.ai ?? {};
+      const provider = isAiProviderId(s.provider) ? s.provider : null;
+      const apiKey = await loadSecret(c, orgId, null, "ai_api_key");
+      return buildProvider(aiEnv, { provider, model: typeof s.model === "string" && s.model ? s.model : null, apiKey });
+    },
+  },
 };
 
 const worker = new Worker(
@@ -121,4 +134,4 @@ async function shutdown(signal: string) {
 }
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
-log.info({ redis: redisUrl.replace(/\/\/.*@/, "//***@"), web_push: Boolean(vapid), email: emailTransport }, "worker_started");
+log.info({ redis: redisUrl.replace(/\/\/.*@/, "//***@"), web_push: Boolean(vapid), email: emailTransport, ai_provider: aiEnv.provider ?? "none" }, "worker_started");

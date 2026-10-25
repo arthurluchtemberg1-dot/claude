@@ -8,10 +8,10 @@ Atualizado em: 2026-10-25. Estados de requisito conforme R11-03/R46-01: "Impleme
 
 | Estado | Requisitos |
 | --- | --- |
-| ✅ Implementado localmente | 235 |
-| 🟡 Parcial | 81 |
+| ✅ Implementado localmente | 241 |
+| 🟡 Parcial | 87 |
 | ⛔ Bloqueado externamente | 12 |
-| ⏳ Planejado | 95 |
+| ⏳ Planejado | 83 |
 | 📄 Método/documento | 13 |
 | **Total** | **436** |
 
@@ -531,18 +531,18 @@ Colunas: ID · requisito (resumo; texto completo no PRD) · etapa · estado · i
 
 | ID | Requisito | Etapa | Estado | Implementação | Testes | Dependência | Observação |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| R27-01 | Assistente que analisa campanhas, explica indicadores, aponta inconsistências, sugere ações e gera relatórios. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
-| R27-02 | Provedores intercambiáveis (OpenAI, Anthropic, Google, chaves próprias); modelos não fixados sem consulta. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
-| R27-03 | Fluxos: contribuição negativa, mudança de ROAS (observação vs hipótese), vendas sem origem, comparação de criativos com amostra, sugestão d… | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
-| R27-04 | Ferramentas tipadas e autorizadas; nunca SQL arbitrário do modelo. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
-| R27-05 | Cálculos pelo serviço de métricas. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
-| R27-06 | Afirmações vinculadas a valores, filtros, período, fontes e atualização; fato vs interpretação vs hipótese vs recomendação vs ausente. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
-| R27-07 | Limitação de amostra; sem causalidade não demonstrada. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
-| R27-08 | Auditoria de consultas/ações com retenção e mascaramento; sem payloads/dados pessoais por padrão. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
-| R27-09 | Nomes de campanha/páginas/mensagens tratados como não confiáveis (anti prompt injection). | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
-| R27-10 | Sem chave/conectividade: estado indisponível, sem simular análise. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
-| R27-11 | Limites de custo, chamadas, tokens, concorrência e cancelamento por organização. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
-| R27-12 | Modos: análise, sugestão, execução sob política; mesma autorização/limites/idempotência das regras; sem acesso direto irrestrito. | E6 | ⏳ Planejado | Etapa E6 |  | DEP-AI |  |
+| R27-01 | Assistente que analisa campanhas, explica indicadores, aponta inconsistências, sugere ações e gera relatórios. | E6 | 🟡 Parcial | packages/ai (provider.ts, tools.ts, run.ts); apps/api/src/routes/ai.ts; migrations/0019; apps/web/app/(app)/gestor-ia | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI | Análise, explicação, inconsistências e sugestão de regra; relatório agendado pendente; uso real depende de chave |
+| R27-02 | Provedores intercambiáveis (OpenAI, Anthropic, Google, chaves próprias); modelos não fixados sem consulta. | E6 | 🟡 Parcial | Interface de provedor; adaptador Anthropic (SDK oficial) com modelo configurável e teste de chave/modelo pela Models API; chave do ambiente ou própria da organização (cofre) | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI | OpenAI/Google planejados: formatos não verificados na documentação oficial neste ambiente |
+| R27-03 | Fluxos: contribuição negativa, mudança de ROAS (observação vs hipótese), vendas sem origem, comparação de criativos com amostra, sugestão d… | E6 | 🟡 Parcial | Ferramentas para contribuição, comparação de períodos, vendas sem origem, comparação de anúncios com amostra e sugestão de regra sem ativar; exemplos de perguntas no painel | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI | Resumo diário/semanal programado pendente |
+| R27-04 | Ferramentas tipadas e autorizadas; nunca SQL arbitrário do modelo. | E6 | ✅ Implementado localmente | 6 ferramentas tipadas (esquemas estritos + validação zod), somente leitura, sem SQL do modelo | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI |  |
+| R27-05 | Cálculos pelo serviço de métricas. | E6 | ✅ Implementado localmente | Ferramentas chamam packages/analytics e domínio; variações entre períodos calculadas pelo sistema | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI |  |
+| R27-06 | Afirmações vinculadas a valores, filtros, período, fontes e atualização; fato vs interpretação vs hipótese vs recomendação vs ausente. | E6 | 🟡 Parcial | Resultados com período, data de corte e fonte; instrução de seções Fatos/Interpretação/Hipóteses/Recomendações/Dados ausentes; fontes consultadas exibidas por resposta | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI | Vinculação automática afirmação→valor não é verificada (o modelo é instruído; as fontes ficam visíveis) |
+| R27-07 | Limitação de amostra; sem causalidade não demonstrada. | E6 | 🟡 Parcial | Instrução de amostra e não causalidade; ferramentas devolvem contagens/frações (amostra) | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI | Comportamento do modelo não é garantido por código |
+| R27-08 | Auditoria de consultas/ações com retenção e mascaramento; sem payloads/dados pessoais por padrão. | E6 | ✅ Implementado localmente | ai_tool_calls (ferramenta, parâmetros, tamanho, duração) com retenção de 180 dias e expurgo no ciclo do agendador; sem dados pessoais nas ferramentas; auditoria no painel | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI |  |
+| R27-09 | Nomes de campanha/páginas/mensagens tratados como não confiáveis (anti prompt injection). | E6 | ✅ Implementado localmente | Resultados prefixados como dados; instrução de sistema contra instruções embutidas; sem ferramentas de escrita | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI | Resistência do modelo à injeção não é testável com provedor falso |
+| R27-10 | Sem chave/conectividade: estado indisponível, sem simular análise. | E6 | ✅ Implementado localmente | Sem provedor/chave ou desligado: estado indisponível com motivo; pergunta recusada (409); nada simulado | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI |  |
+| R27-11 | Limites de custo, chamadas, tokens, concorrência e cancelamento por organização. | E6 | ✅ Implementado localmente | Perguntas e tokens por dia por organização, rodadas de ferramenta por resposta, 3 análises simultâneas por organização, cancelamento entre rodadas, tempo limite do provedor | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI |  |
+| R27-12 | Modos: análise, sugestão, execução sob política; mesma autorização/limites/idempotência das regras; sem acesso direto irrestrito. | E6 | 🟡 Parcial | Modos análise e sugestão; a IA não tem acesso a ações, banco, credenciais ou gerenciador de anúncios | apps/api/test/integration/ai.test.ts (provedor falso); packages/ai/test/anthropic-adapter.test.ts (servidor local que imita a API); E2E T70 (indisponível sem provedor) | DEP-AI | Execução sob política não implementada por decisão (D-031) |
 
 ### 28. WhatsApp
 

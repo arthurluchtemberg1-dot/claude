@@ -7,7 +7,7 @@ import { decryptSecret, encryptSecret } from "../lib/crypto";
  * AAD vincula cada valor à organização, conexão e finalidade: um ciphertext copiado para outra linha não decifra.
  */
 
-export type CredentialPurpose = "webhook_secret" | "oauth_access_token" | "oauth_refresh_token" | "api_key" | "capi_access_token" | "outbound_signing_secret";
+export type CredentialPurpose = "webhook_secret" | "oauth_access_token" | "oauth_refresh_token" | "api_key" | "capi_access_token" | "outbound_signing_secret" | "ai_api_key";
 
 const aad = (orgId: string, connectionId: string | null, purpose: string) => `${orgId}:${connectionId ?? "-"}:${purpose}`;
 

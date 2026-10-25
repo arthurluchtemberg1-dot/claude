@@ -197,6 +197,12 @@ test("T70 jornada completa: cadastro → conexão Lowify → visita com SDK → 
   await page.getByRole("button", { name: "Ativar" }).click();
   await expect(page.getByText("Ativa", { exact: true })).toBeVisible();
 
+  // 7a3. Gestor IA sem provedor configurado: estado indisponível explícito, nenhuma análise simulada (R27-10).
+  await page.goto("/gestor-ia");
+  await expect(page.getByText("Gestor IA indisponível")).toBeVisible();
+  await expect(page.getByText(/Nenhum provedor de IA configurado/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Perguntar" })).toHaveCount(0);
+
   // 7b. API pública: chave exibida uma única vez e usável; revogação imediata.
   await page.goto("/api-webhooks");
   await page.getByRole("button", { name: "Criar chave" }).click();

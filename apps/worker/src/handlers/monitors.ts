@@ -168,6 +168,9 @@ export async function runMonitors(c: PoolClient, orgId: string, now: Date): Prom
       }, now);
     }
   }
+  // Retenção do Gestor IA (R27-08): conversas e auditoria expiradas são removidas.
+  await c.query("delete from public.ai_tool_calls where organization_id = $1 and retention_until < $2", [orgId, now]);
+  await c.query("delete from public.ai_conversations where organization_id = $1 and retention_until < $2", [orgId, now]);
   return { alerts };
 }
 

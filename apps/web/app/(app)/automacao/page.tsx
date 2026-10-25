@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DECISION_TONE, LEVEL_LABEL, RULE_STATUS as STATUS, RuleBuilder, type Catalog } from "@/components/rule-builder";
 import { useSession } from "@/components/shell";
 import { Alert, Badge, Button, Card, Empty, ErrorBox, PageHeader, Table, Td, useToast } from "@/components/ui";
@@ -49,6 +49,18 @@ export default function AutomationPage() {
   const [draft, setDraft] = useState<{ def: any; name: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const tz = org.organization.timezone;
+  // Regra sugerida pelo Gestor IA: abre no construtor como rascunho (nada é salvo ou ativado sem o usuário).
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("trk_rule_draft");
+      if (!raw) return;
+      sessionStorage.removeItem("trk_rule_draft");
+      const d = JSON.parse(raw);
+      setDraft({ def: d.definition, name: d.name });
+    } catch {
+      /* ignorar */
+    }
+  }, []);
 
   const act = async (id: string, what: "simulate" | "activate" | "shadow" | "pause") => {
     setErr(null);

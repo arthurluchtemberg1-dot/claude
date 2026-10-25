@@ -7,7 +7,6 @@ import { Badge, Card, PageHeader } from "@/components/ui";
  */
 const MODULES: Record<string, { title: string; stage: string; reqs: string; summary: string; blockers?: string }> = {
   campanhas: { title: "Gestão de campanhas", stage: "E6", reqs: "R25-01..R25-11", summary: "Consulta, pausa/ativação, orçamento, duplicação e criação rápida somente nas redes com capacidade implementada e permissão de escrita.", blockers: "Leitura e escrita Meta exigem app aprovado e OAuth (DEP-META-APP)." },
-  ia: { title: "Gestor com IA", stage: "E6", reqs: "R27-01..R27-12", summary: "Análises com ferramentas tipadas sobre o serviço de métricas; sem SQL arbitrário; estado indisponível sem chave configurada.", blockers: "Requer provedor/chave de IA configurados (DEP-AI)." },
   "whatsapp-crm": { title: "WhatsApp e CRM", stage: "E7", reqs: "R28-01..R29-09", summary: "Atribuição de conversas via APIs oficiais, CRM leve e recuperação com consentimento e revalidação antes do envio.", blockers: "Número e app na WhatsApp Business Platform (DEP-WHATSAPP)." },
   funis: { title: "Funis, VSL e experimentos", stage: "E7", reqs: "R30-01..R31-05", summary: "Etapas observadas, alocação estável de variantes e análise de criativos sem números inventados." },
   relatorios: { title: "Relatórios e exportações", stage: "E8", reqs: "R32-01..R32-10", summary: "Relatórios salvos, XLSX/PDF, links com expiração e agendamentos. Já disponível: exportação CSV de pedidos com neutralização de fórmulas." },
