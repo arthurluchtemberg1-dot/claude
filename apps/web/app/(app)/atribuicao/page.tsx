@@ -207,7 +207,7 @@ export default function AttributionPage() {
         {compare.data && (
           <div className="grid gap-4 lg:grid-cols-2">
             {compare.data.policies.map((p) => (
-              <div key={p.policy_key} className="rounded-lg border border-border p-3">
+              <div key={p.policy_key} className="min-w-0 rounded-lg border border-border p-3">
                 <h3 className="font-medium">
                   {p.name} <span className="text-xs text-muted">({p.model_label}, {p.window_days} d, v{p.version})</span>
                 </h3>

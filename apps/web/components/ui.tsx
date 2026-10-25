@@ -45,18 +45,20 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
   );
 }
 
-const inputCls = "w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted";
+const inputCls = "rounded-md border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted";
+/** Largura padrão total, a menos que a classe recebida defina outra (w-auto, w-40…). */
+const withWidth = (className?: string) => cx(inputCls, !/(^|\s)(\w+:)?w-/.test(className ?? "") && "w-full", className);
 
 export function Input(p: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...p} className={cx(inputCls, p.className)} />;
+  return <input {...p} className={withWidth(p.className)} />;
 }
 
 export function Textarea(p: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...p} className={cx(inputCls, "font-mono", p.className)} />;
+  return <textarea {...p} className={cx(withWidth(p.className), "font-mono")} />;
 }
 
 export function Select(p: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...p} className={cx(inputCls, p.className)} />;
+  return <select {...p} className={withWidth(p.className)} />;
 }
 
 export function Card({ title, actions, children, className }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
@@ -130,7 +132,7 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
 
 export function Table({ headers, children, caption }: { headers: ReactNode[]; children: ReactNode; caption?: string }) {
   return (
-    <div className="overflow-x-auto rounded-md border border-border">
+    <div className="relative overflow-x-auto rounded-md border border-border">
       <table className="w-full min-w-[640px] border-collapse text-sm">
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead className="bg-surface-2 text-left text-xs uppercase tracking-wide text-muted">
@@ -197,6 +199,54 @@ export function PageHeader({ title, description, actions }: { title: string; des
         {description && <p className="mt-1 max-w-3xl text-sm text-muted">{description}</p>}
       </div>
       {actions}
+    </div>
+  );
+}
+
+/** Interruptor acessível (role="switch"); o estado só muda depois da confirmação do servidor. */
+export function Switch({ checked, onChange, label, disabled, busy, title }: { checked: boolean; onChange: (on: boolean) => void; label: string; disabled?: boolean; busy?: boolean; title?: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      aria-busy={busy || undefined}
+      title={title}
+      disabled={disabled || busy}
+      onClick={() => onChange(!checked)}
+      className={cx(
+        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-50",
+        checked ? "border-ok bg-ok" : "border-border bg-surface-2",
+        busy && "animate-pulse",
+      )}
+    >
+      <span className={cx("inline-block h-4 w-4 rounded-full bg-white shadow transition", checked ? "translate-x-6" : "translate-x-1")} aria-hidden />
+    </button>
+  );
+}
+
+/** Diálogo modal simples: foco no conteúdo, Esc fecha, clique fora fecha. */
+export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const id = useId();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-labelledby={id} className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl border border-border bg-surface p-4 shadow-xl sm:max-w-lg sm:rounded-xl">
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <h2 id={id} className="text-base font-semibold">
+            {title}
+          </h2>
+          <button type="button" aria-label="Fechar" className="rounded px-2 text-muted hover:bg-surface-2" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        {children}
+      </div>
     </div>
   );
 }

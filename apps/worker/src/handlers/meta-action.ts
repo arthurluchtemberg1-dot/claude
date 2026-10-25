@@ -83,17 +83,15 @@ export async function runMetaAction(runTx: RunTx, deps: MetaSyncDeps & { allowEx
       const cur = await g.entity(ch.entity_id, ch.level);
       await saveEntity(runTx, orgId, ch, cur, now);
       if (!applied(ch.level, requested, cur)) return finish("failed", { after: cur, error: "A Meta aceitou o pedido mas a leitura posterior não mostra a alteração" });
+      // Pausar/ativar campanha ou conjunto muda o status efetivo dos níveis abaixo: ressincroniza a conta (1x por minuto).
+      if (requested.status !== undefined && ch.level !== "ad") await enqueueResync(runTx, orgId, ch.connection_id, `status:${Math.floor(now.getTime() / 60_000)}`);
       return finish("succeeded", { after: { status: cur.status, daily_budget: cur.daily_budget ?? null, name: cur.name } });
     }
     // Duplicação: não reconciliável por leitura; uma "unknown" não é repetida automaticamente (evita cópias em dobro).
     if (prep.wasUnknown) return finish("failed", { error: "Duplicação sem confirmação: confira no Gerenciador de Anúncios antes de repetir" });
     const res = await g.copy(ch.entity_id, requested);
     const newId = String(res.copied_campaign_id ?? res.copied_adset_id ?? res.copied_ad_id ?? res.id ?? "");
-    await runTx((c) =>
-      c.query("insert into public.outbox (organization_id, topic, payload, dedup_key, priority) values ($1, 'meta.sync', $2, $3, 3) on conflict do nothing", [
-        orgId, JSON.stringify({ connection_id: ch.connection_id }), `meta-sync:${ch.connection_id}:after-copy:${changeId}`,
-      ]),
-    );
+    await enqueueResync(runTx, orgId, ch.connection_id, `after-copy:${changeId}`);
     return finish("succeeded", { after: { copy_id: newId || null, status: "PAUSED" } });
   } catch (err) {
     const e = err instanceof MetaGraphError ? err : new MetaGraphError((err as Error).message, "network", null, null, null);
@@ -102,6 +100,14 @@ export async function runMetaAction(runTx: RunTx, deps: MetaSyncDeps & { allowEx
     if (e.kind === "auth") await runTx((c) => c.query("update public.provider_connections set status = 'token_expired', last_error = $2, last_error_at = $3 where id = $1", [ch.connection_id, e.message.slice(0, 500), now]));
     return finish("failed", { error: e.message });
   }
+}
+
+async function enqueueResync(runTx: RunTx, orgId: string, connectionId: string, key: string) {
+  await runTx((c) =>
+    c.query("insert into public.outbox (organization_id, topic, payload, dedup_key, priority) values ($1, 'meta.sync', $2, $3, 3) on conflict do nothing", [
+      orgId, JSON.stringify({ connection_id: connectionId }), `meta-sync:${connectionId}:${key}`,
+    ]),
+  );
 }
 
 async function saveEntity(runTx: RunTx, orgId: string, ch: { ad_account_id: string; level: string; entity_id: string }, cur: { status?: string; effective_status?: string; daily_budget?: string; name?: string }, now: Date) {

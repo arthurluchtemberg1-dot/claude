@@ -200,7 +200,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2">
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Button variant="ghost" className="px-2 md:hidden" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}>
                 ☰
               </Button>
@@ -220,7 +220,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </option>
                 ))}
               </Select>
-              {value.org.organization.is_demo && <Badge tone="warn">Organização de demonstração — dados sintéticos</Badge>}
+              {value.org.organization.is_demo && (
+                <Badge tone="warn" title="Organização de demonstração — dados sintéticos">
+                  Demonstração<span className="hidden lg:inline">&nbsp;— dados sintéticos</span>
+                </Badge>
+              )}
               {value.org.organization.internal_mode && <Badge>Uso interno</Badge>}
             </div>
             <div className="flex items-center gap-2 text-sm">

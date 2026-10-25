@@ -163,7 +163,7 @@ export async function startFakeMeta(version = "v26.0"): Promise<FakeMeta> {
     return json(res, 405, { error: { message: "method" } });
   };
   const server = createServer((req, res) => void handler(req, res));
-  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  await new Promise<void>((r) => server.listen(Number(process.env.FAKE_META_PORT ?? 0), "127.0.0.1", r));
   const server_url = () => `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return { ...state, url: server_url(), close: () => new Promise<void>((r) => { server.closeAllConnections(); server.close(() => r()); }) } as FakeMeta;
 }

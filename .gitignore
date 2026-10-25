@@ -17,3 +17,6 @@ packages/tracker/dist/
 apps/web/public/sdk/
 .e2e-outbox/
 apps/web/test-results/
+# Gerados pelo next dev (regras para agentes)
+apps/web/AGENTS.md
+apps/web/CLAUDE.md

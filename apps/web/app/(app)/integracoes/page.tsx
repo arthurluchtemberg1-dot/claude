@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useSession } from "@/components/shell";
 import { Alert, Badge, Button, Card, CopyButton, Empty, ErrorBox, Field, Input, PageHeader, Select, Skeleton, Table, Td, useToast } from "@/components/ui";
@@ -236,6 +237,7 @@ export default function IntegrationsPage() {
         description="Conexões ativas e catálogo com o estado real de cada conector. Um card no catálogo não significa que a integração funciona."
         actions={can("provider.connect") ? <Button onClick={() => setShowNew((s) => !s)}>{showNew ? "Cancelar" : "Nova conexão"}</Button> : null}
       />
+      <MetaCard />
       {showNew && projects.data && (
         <Card title="Nova conexão de checkout">
           <NewConnection
@@ -313,7 +315,7 @@ export default function IntegrationsPage() {
       <Card
         title={`Catálogo (${catalog.data?.connectors.length ?? "…"} integrações)`}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Select aria-label="Grupo" value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} className="w-auto">
               <option value="">Todos os grupos</option>
               {groups.map((g) => (
@@ -389,5 +391,28 @@ export default function IntegrationsPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+function MetaCard() {
+  const { data } = useApi<Any>("/v1/meta");
+  const conn = data?.connection;
+  const active = (data?.accounts ?? []).filter((a: Any) => a.sync_enabled).length;
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-semibold">Meta Ads (Facebook e Instagram)</p>
+          <p className="text-sm text-muted">
+            {conn
+              ? `${conn.status === "connected" ? "Conectada" : (CONN_LABEL[conn.status] ?? conn.status)} · ${active} conta(s) sincronizando · ${data.pixels.length} pixel(s) · ${data.pages.length} página(s)`
+              : "Conecte para trazer campanhas, gasto e controlar anúncios pelo painel."}
+          </p>
+        </div>
+        <Link href="/integracoes/meta" className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-contrast hover:opacity-90">
+          {conn ? "Gerenciar" : "Conectar Meta"}
+        </Link>
+      </div>
+    </Card>
   );
 }

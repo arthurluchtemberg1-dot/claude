@@ -56,7 +56,12 @@ const deps: WorkerDeps = {
   rules: { systemKillSwitch: process.env.RULES_KILL_SWITCH === "true", allowExternal: process.env.ALLOW_EXTERNAL_DELIVERY === "true" },
   meta: {
     loadToken: (c, orgId, connectionId) => loadSecret(c, orgId, connectionId, "oauth_access_token"),
-    graph: { version: process.env.META_GRAPH_API_VERSION ?? "v26.0", appSecret: process.env.META_APP_SECRET || null },
+    graph: {
+      version: process.env.META_GRAPH_API_VERSION ?? "v26.0",
+      appSecret: process.env.META_APP_SECRET || null,
+      // Somente fora de produção: Graph API falsa local para demonstração/testes (apps/api/test/fake-meta-server.ts).
+      baseUrl: process.env.APP_ENV !== "production" && process.env.META_GRAPH_BASE_URL ? process.env.META_GRAPH_BASE_URL : undefined,
+    },
   },
   ai: {
     // Chave própria da organização (cofre) tem prioridade sobre a do ambiente.
