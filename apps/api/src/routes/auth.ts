@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { z } from "zod";
 import type { AppDeps } from "../context";
-import { unauthorized } from "../lib/errors";
+import { forbidden, unauthorized } from "../lib/errors";
 import * as auth from "../services/auth";
 
 const email = z.string().trim().email().max(254);
@@ -23,6 +23,7 @@ export const authRoutes =
     const limited = { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } };
 
     app.post("/signup", limited, async (req, reply) => {
+      if (deps.config.SIGNUP_MODE === "closed") throw forbidden("signup_closed", "Cadastro público fechado nesta instalação. Peça acesso ao proprietário.");
       const body = z.object({ email, password, displayName: z.string().trim().min(1).max(120) }).parse(req.body);
       await auth.signup(deps, body);
       const s = await auth.login(deps, { email: body.email, password: body.password, ip: req.ip, userAgent: req.headers["user-agent"] ?? null });

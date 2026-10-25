@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "@/components/shell";
 import { Alert, Badge, Button, Card, CopyButton, Field, Input, PageHeader, Select, Table, Td, useToast } from "@/components/ui";
 import { api, ApiError, useApi } from "@/lib/api";
@@ -141,12 +141,14 @@ export default function SettingsPage() {
         </Card>
       )}
 
+      <div id="mfa" className="scroll-mt-20" />
       <Card title="Segurança da conta">
         {me.user.mfa_enabled ? (
           <Alert tone="ok" title="Autenticação multifator ativa" />
         ) : mfa ? (
           <div className="space-y-2 text-sm">
-            <p>Adicione no aplicativo autenticador (URI otpauth) ou digite o segredo manualmente:</p>
+            <p>Leia o QR code com o aplicativo autenticador (Google Authenticator, Authy, 1Password…) ou digite o segredo manualmente:</p>
+            <QrCode value={mfa.otpauth_url} />
             <div className="flex flex-wrap gap-2">
               <Input readOnly value={mfa.secret} className="max-w-xs font-mono" aria-label="Segredo" />
               <CopyButton value={mfa.otpauth_url} label="Copiar URI otpauth" />
@@ -202,4 +204,17 @@ export default function SettingsPage() {
       )}
     </div>
   );
+}
+
+/** QR code gerado no navegador (o segredo não sai do dispositivo). */
+function QrCode({ value }: { value: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void import("qrcode").then((q) => q.toDataURL(value, { margin: 1, width: 200 })).then((u) => alive && setSrc(u)).catch(() => setSrc(null));
+    return () => {
+      alive = false;
+    };
+  }, [value]);
+  return src ? <img src={src} alt="QR code para o aplicativo autenticador" width={200} height={200} className="rounded border border-border bg-white" /> : null;
 }

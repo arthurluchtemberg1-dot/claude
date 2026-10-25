@@ -30,7 +30,9 @@ const schema = z.object({
     .default("false")
     .transform((v) => v === "true"),
   SESSION_TTL_HOURS: z.coerce.number().int().positive().max(24 * 90).default(336),
-  EMAIL_TRANSPORT: z.enum(["log", "memory", "file", "smtp"]).default("log"),
+  EMAIL_TRANSPORT: z.enum(["log", "memory", "file", "smtp", "disabled"]).default("log"),
+  // "closed": sem cadastro público (instalação privada; contas criadas pelo proprietário/linha de comando).
+  SIGNUP_MODE: z.enum(["open", "closed"]).default("open"),
   EMAIL_OUTBOX_DIR: z.string().optional(),
   EMAIL_FROM: z.string().default("Tracker <no-reply@example.com>"),
   SMTP_URL: z.string().optional(),

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "@/components/shell";
 import { useApi } from "@/lib/api";
 
 /**
@@ -21,6 +22,7 @@ export interface SetupStep {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function useSetupProgress() {
+  const { me, org } = useSession();
   const conns = useApi<{ connections: any[] }>("/v1/connections");
   const orders = useApi<{ orders: any[] }>("/v1/orders?limit=30");
   const diag = useApi<{ tracking?: { last_event_at: string | null } }>("/v1/diagnostics/overview");
@@ -31,6 +33,16 @@ export function useSetupProgress() {
   const val = <T,>(r: { data: T | null; error: unknown }, f: (d: T) => boolean): boolean | null => (r.error ? null : r.data ? f(r.data) : null);
 
   const steps: SetupStep[] = [
+    {
+      key: "mfa",
+      title: "Ative a verificação em duas etapas",
+      description: "Exigida para conectar integrações e liberar ações. Leia o QR code com um app autenticador (Google Authenticator, Authy…).",
+      href: "/configuracoes#mfa",
+      cta: "Ativar agora",
+      optional: !org.organization.mfa_required,
+      done: me.user.mfa_enabled,
+      minutes: 2,
+    },
     {
       key: "checkout",
       title: "Conecte seu checkout",

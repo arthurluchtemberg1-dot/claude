@@ -1,7 +1,9 @@
-# Implantação de referência (homologação/produção pequena). TLS e domínio ficam num proxy reverso à frente
-# (ex.: Caddy/Nginx/balanceador): exponha o painel (3000) e a API (4000, webhooks e /public/v1) somente via HTTPS.
-#   cp deploy/.env.example deploy/.env   # preencha os segredos
-#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+# Implantação de referência (homologação/produção pequena).
+# Caminho rápido: sudo bash deploy/install.sh --domain painel.seudominio.com.br --email voce@seudominio.com.br
+#   (gera deploy/.env com segredos, sobe tudo com HTTPS automático pelo perfil "https" — Caddy — e cria o proprietário).
+# Manual: cp deploy/.env.example deploy/.env (preencha) e
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env --profile https up -d --build
+# Sem o perfil "https", use seu próprio proxy reverso e exponha painel (3000) e API (4000) somente via HTTPS.
 # Ver docs/DEPLOYMENT.md (checklist, backup/restauração, rotação de chaves).
 name: tracker
 
@@ -36,6 +38,9 @@ x-app-env: &app-env
   WEBHOOK_RATE_LIMIT_PER_MINUTE: ${WEBHOOK_RATE_LIMIT_PER_MINUTE:-600}
   COLLECT_RATE_LIMIT_PER_MINUTE: ${COLLECT_RATE_LIMIT_PER_MINUTE:-300}
   LOG_LEVEL: ${LOG_LEVEL:-info}
+  SIGNUP_MODE: ${SIGNUP_MODE:-open}
+  META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION:-v26.0}
+  META_APP_SECRET: ${META_APP_SECRET:-}
 
 services:
   postgres:
@@ -120,6 +125,28 @@ services:
       api: { condition: service_healthy }
     restart: unless-stopped
 
+  # HTTPS automático (Let's Encrypt) no domínio do painel; a API fica em /api no mesmo domínio (deploy/Caddyfile).
+  caddy:
+    image: caddy:2.10.0
+    profiles: ["https"]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      TRACKER_DOMAIN: ${TRACKER_DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on:
+      web: { condition: service_healthy }
+      api: { condition: service_healthy }
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:
+  caddydata:
+  caddyconfig:

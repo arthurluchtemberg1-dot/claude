@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useSession } from "@/components/shell";
-import { Alert, Badge, Button, Card, CopyButton, ErrorBox, Field, Input, PageHeader, Select, Skeleton, Switch, useToast } from "@/components/ui";
+import { Alert, Badge, Button, Card, CopyButton, ErrorBox, Field, Input, MfaHint, PageHeader, Select, Skeleton, Switch, useToast } from "@/components/ui";
 import { api, ApiError, useApi } from "@/lib/api";
 import { dateTime, money } from "@/lib/format";
 
@@ -58,6 +58,7 @@ export default function MetaPage() {
   const [projectId, setProjectId] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [formCode, setFormCode] = useState<string | null>(null);
   const [check, setCheck] = useState<{ ok: boolean; error?: string; permissions?: string[] } | null>(null);
   const { toast, toastNode } = useToast();
   const tz = org.organization.timezone;
@@ -88,6 +89,7 @@ export default function MetaPage() {
       await reload();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Falha ao conectar");
+      setFormCode(err instanceof ApiError ? err.code : null);
     } finally {
       setBusy(null);
     }
@@ -209,6 +211,7 @@ export default function MetaPage() {
                 )}
               </Field>
             )}
+            <MfaHint code={formCode} />
             <Button type="submit" busy={busy === "connect"} disabled={token.trim().length < 20}>
               {conn ? "Reconectar" : "Conectar Meta"}
             </Button>

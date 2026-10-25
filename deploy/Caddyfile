@@ -1,0 +1,15 @@
+# HTTPS automático (Let's Encrypt) para o domínio do painel. A API fica sob /api no MESMO domínio
+# (webhooks: https://DOMINIO/api/v1/webhooks/..., SDK e coleta), o painel no restante.
+{
+	email {$ACME_EMAIL}
+}
+
+{$TRACKER_DOMAIN} {
+	encode zstd gzip
+	handle_path /api/* {
+		reverse_proxy api:4000
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}

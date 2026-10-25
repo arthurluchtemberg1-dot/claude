@@ -49,7 +49,7 @@ const deps: WorkerDeps = {
   outbound: { policy: outboundPolicy, loadSecrets: createSubscriptionSecretLoader() },
   notifications: {
     allowExternal: process.env.ALLOW_EXTERNAL_DELIVERY === "true",
-    email,
+    email: email.disabled ? null : email,
     push: vapid ? createPushSender(vapid, { ...outboundPolicy, requireHttps: true }, pushHostsFromEnv(process.env)) : null,
     appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   },

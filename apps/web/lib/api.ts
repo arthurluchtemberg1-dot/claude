@@ -65,7 +65,10 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
   }
   if (!res.ok) {
     const e = (json as { error?: { code?: string; message?: string; request_id?: string; details?: unknown } } | null)?.error;
-    throw new ApiError(res.status, e?.code ?? "http_error", e?.message ?? `Erro HTTP ${res.status}`, e?.request_id, e?.details);
+    const code = e?.code ?? "http_error";
+    // Ações sensíveis sem MFA: diz onde ativar (toasts não têm link).
+    const hint = code === "mfa_setup_required" ? " — ative em Configurações → Segurança da conta" : "";
+    throw new ApiError(res.status, code, `${e?.message ?? `Erro HTTP ${res.status}`}${hint}`, e?.request_id, e?.details);
   }
   return json as T;
 }

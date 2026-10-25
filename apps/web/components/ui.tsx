@@ -100,11 +100,22 @@ export function Alert({ tone = "info", title, children }: { tone?: "info" | "war
   );
 }
 
+/** Link para ativar MFA quando o servidor recusa uma ação por falta dela. */
+export function MfaHint({ code }: { code?: string | null }) {
+  if (code !== "mfa_setup_required" && code !== "mfa_verification_required") return null;
+  return (
+    <a href="/configuracoes#mfa" className="ml-1 font-medium text-primary underline">
+      Ativar verificação em duas etapas
+    </a>
+  );
+}
+
 export function ErrorBox({ error, onRetry }: { error: ApiError | Error | null; onRetry?: () => void }) {
   if (!error) return null;
   const rid = (error as ApiError).requestId;
   return (
     <Alert tone="err" title={error.message}>
+      <MfaHint code={(error as ApiError).code} />
       {rid && <span className="font-mono text-xs">request_id: {rid}</span>}
       {onRetry && (
         <div className="mt-2">
