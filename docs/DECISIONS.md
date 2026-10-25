@@ -121,3 +121,22 @@ Formato: decisão · contexto · alternativas rejeitadas · consequências. Reve
 - Provedor Anthropic pelo SDK oficial (`@anthropic-ai/sdk`), modelo padrão `claude-opus-5-5` sobrescrevível por `AI_MODEL` ou por organização, esforço `medium` (`AI_EFFORT`), ferramentas estritas, cache de prompt no sistema/ferramentas e recuperação do servidor após recusa (`fallbacks: "default"`, desligável com `AI_FALLBACKS=off`). O histórico é guardado exatamente como o provedor devolveu (só anexado); trocar de provedor ou modelo inicia contexto novo.
 - OpenAI e Google ficam "planejados" com o motivo: os formatos dessas APIs não foram verificados na documentação oficial neste ambiente e não serão escritos de memória.
 - Ligar a IA e cadastrar chave própria são decisões do proprietário (`org.manage`, MFA quando exigido). O modo "execução sob política" não existe: a IA sugere; regras ativadas por pessoas executam com as travas do motor de regras.
+
+## D-032 — Meta por token de usuário do sistema, formatos conferidos nos SDKs oficiais
+- Conexão por token de **usuário do sistema do Business Manager** colado no painel (campo protegido, validado em `/me`, `/me/permissions` e `/me/adaccounts`, cifrado e nunca devolvido) em vez de OAuth/Facebook Login: para uso no próprio negócio não exige App Review nem endpoints de diálogo que não puderam ser verificados (documentação bloqueada pelo proxy). Contas de terceiros ficam fora do escopo (DEP-META-APP).
+- Formatos e campos conferidos nos SDKs oficiais `facebook-nodejs-business-sdk` 24.0.1 (npm) e `facebook_business` 26.0.2 (PyPI, versão Graph padrão v26.0, `appsecret_proof` por HMAC-SHA256), consultados em 25/10/2026: `access_token` na query, paginação por `paging.next` (seguida só no host da API), erros `{error:{code,error_subcode,is_transient,fbtrace_id}}`, atualização por POST no nó, cópia por POST `/{id}/copies`, `learning_stage_info` do conjunto, valores de conta/orçamento em inteiro na menor unidade e `spend` de insights em decimal.
+- Insights em 3 níveis por dia com substituição do snapshot do período; o painel escolhe um nível por conta/dia (D-021). Compras reportadas pela Meta (`purchase`) ficam em colunas próprias e nunca se somam às vendas confirmadas.
+- Token inválido (190/102) marca a conexão como `token_expired` e avisa; limite de taxa (4/17/32/613, 80000–80014) volta para a fila com espera.
+- `META_GRAPH_BASE_URL` existe só para a Graph API falsa local (testes e demonstração) e é recusado em produção.
+
+## D-033 — Alterações de mídia planejadas no servidor e reconciliadas antes de repetir
+- Painel e regras usam o mesmo planejamento (`packages/analytics/src/media-actions.ts`): confere entidade, conexão, projeto, estado (excluída/arquivada), calcula orçamento exato (percentual em centésimos, mínimo da conta, variação máxima e teto) e grava `media_changes` (antes/pedido/depois, autor, regra) com chave de idempotência por pedido/item antes de enfileirar `meta.action`.
+- Gestão só com as três travas: token com `ads_management`, liberação do proprietário (`settings.media.media_writes`) e `ALLOW_EXTERNAL_DELIVERY=true`; ações do painel exigem `media.execute` com MFA quando a organização exige.
+- Escrita sem resposta vira `unknown`: a próxima tentativa lê a entidade e conclui sem escrever se o efeito já ocorreu (não pausa duas vezes nem dobra orçamento). Duplicação sem resposta não é repetida automaticamente (evita cópias em dobro). Toda escrita é confirmada lendo a entidade de volta.
+- Duplicações nascem pausadas. Pausar/ativar campanha ou conjunto agenda uma ressincronização para atualizar o status efetivo dos níveis abaixo.
+- Regras com ações de mídia excluem por padrão itens em aprendizado pelo status real da Meta; a idade desde o primeiro gasto só é usada quando o status é desconhecido.
+
+## D-034 — Instalação privada em um comando
+- `deploy/install.sh` gera os segredos no servidor (nunca trafegam por mensagem), sobe a pilha com Caddy (HTTPS automático) e serve painel e API no mesmo domínio (API em `/api`, uma entrada de DNS). Rodar de novo atualiza e preserva `deploy/.env`.
+- Instalação privada: cadastro público fechado (`SIGNUP_MODE=closed`), proprietário criado por `admin.js create-owner` (senha digitada no terminal) e `EMAIL_TRANSPORT=disabled` aceito em produção (nenhum link vai para o log); senha e MFA redefinidos por `admin.js`. Com SMTP (`--smtp-url`) os e-mails voltam a funcionar.
+- O instalador pergunta se liga os envios reais (push, ações na Meta, CAPI); o padrão do código continua desligado.

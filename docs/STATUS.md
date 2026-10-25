@@ -1,6 +1,13 @@
 # STATUS
 
-Última atualização: 25/10/2026 (sessão 3). Branch: `claude/blissful-hypatia-9ji33p`.
+Última atualização: 25/10/2026 (sessão 4). Branch: `claude/blissful-hypatia-9ji33p`.
+
+## Sessão 4 — Meta Ads, gerenciador de campanhas e instalação em um comando
+
+- **Meta Ads (R19, R25, R26):** conexão por token de usuário do sistema (D-032), sincronização de contas, campanhas, conjuntos (fase de aprendizado), anúncios, gasto diário em 3 níveis, compras reportadas, pixels e páginas; alertas de limite de gasto, conta com problema e acesso perdido. Gerenciador em **Campanhas** (ligar/desligar, orçamento, lote, duplicar pausado, renomear, histórico) com reconciliação após resposta perdida (D-033). Regras executam pausar/ativar/orçamento/duplicar quando a gestão é liberada e não agem em aprendizado por padrão. Tudo testado contra Graph API falsa; **falta evidência com conta real (DEP-META-ACCOUNT)**.
+- **Painel:** destaques (faturamento, investimento, ROAS, lucro, vendas, CPA) com variação, campanhas em destaque, últimas vendas ao vivo; menu em seções; **Primeiros passos** com checklist verificado no servidor.
+- **Instalação:** `sudo bash deploy/install.sh --domain … --email …` (Docker, segredos, Caddy/HTTPS, proprietário) — validada em contêineres com domínio local; guia de 20 minutos em [`GUIA_RAPIDO.md`](GUIA_RAPIDO.md) (D-034).
+- **Defeitos reais encontrados nesta sessão:** pedido repetido de ação era recusado como "já pausada" em vez de devolvido como duplicado; elementos `sr-only` absolutos dentro de tabelas roláveis alargavam a página no celular; selos do cabeçalho estouravam a largura em 390 px; o instalador abortava quando o DNS ainda não resolvia (pipefail); conexão Meta aparecia com botão "Novo endpoint" na lista de checkouts; campos com largura própria eram sobrescritos por `w-full`.
 
 ## Resumo
 
@@ -20,15 +27,18 @@
 | Categoria | Situação |
 | --- | --- |
 | SDK, passagem de origem, atribuição, deduplicação CAPI | Implementado localmente; Meta CAPI com envio real desligado até DEP-META-APP |
-| Painel, vendas, campanhas, clientes, custos | Implementado (gasto por importação CSV; sincronização Meta bloqueada) |
+| Painel, vendas, campanhas, clientes, custos | Implementado (gasto sincronizado da Meta ou importação CSV) |
 | Notificação de venda no celular (push + som) | Implementado (Web Push/PWA; app nativo nas lojas planejado — DEP-STORES) |
 | Alertas (integração parada, fila, falhas, metas, gasto sem venda) | Implementado (monitores + regras) |
-| Regras automáticas | Implementado com simulação; pausar/ativar/orçamento/duplicar na rede dependem de DEP-META-APP |
+| Regras automáticas | Implementado com simulação; pausar/ativar/orçamento/duplicar executam na Meta com a gestão liberada |
+| Gerenciador de campanhas Meta (ligar/desligar, orçamento, duplicar, lote, histórico) | Implementado localmente (Graph API falsa); validar com sua conta (DEP-META-ACCOUNT) |
 | Gestor IA | Implementado com provedor Anthropic; requer chave (DEP-AI) |
-| Alerta de saldo, criação rápida e duplicação de campanhas | Bloqueado por DEP-META-APP (gestão via API Meta) |
+| Alerta de limite de gasto/conta com problema, duplicação | Implementado (limite de gasto; saldo pré-pago não lido) |
+| Criação rápida de campanhas e biblioteca de criativos | Planejado (R25-07, R25-08) |
+| Instalação em servidor próprio | Um comando com HTTPS (deploy/install.sh) |
 | API pública e webhook de saída | Implementado |
 
-Matriz: 241 requisitos implementados localmente, 87 parciais, 12 bloqueados externamente, 83 planejados, 13 de método/documento. Cenários T01–T70 conforme [`REQUIREMENTS_TRACEABILITY.md`](REQUIREMENTS_TRACEABILITY.md).
+Matriz: 246 requisitos implementados localmente, 99 parciais, 4 bloqueados externamente, 74 planejados, 13 de método/documento. Cenários T01–T70 conforme [`REQUIREMENTS_TRACEABILITY.md`](REQUIREMENTS_TRACEABILITY.md).
 
 ## Evidências (executadas nesta sessão)
 
@@ -36,8 +46,10 @@ Matriz: 241 requisitos implementados localmente, 87 parciais, 12 bloqueados exte
 | --- | --- | --- |
 | Lint | `pnpm lint` | sem erros |
 | Tipos | `pnpm typecheck` | sem erros (10 pacotes; conferir o código de saída — `pnpm -s` omite a saída do erro) |
-| Unitários + integração (PostgreSQL 16 e Redis 7 reais) | `pnpm test` | 263 testes passando (28 arquivos; 4 de desempenho opcionais com `PERF=1`) |
-| E2E navegador (API + worker/BullMQ + painel, banco `tracker_e2e`) | `pnpm test:e2e` | 3 testes passando, incluindo T70 (Campanhas, Clientes, Atribuição, chave de API, sino/central de notificações, manifesto e service worker, meta criada por exemplo → simulada → ativada, Gestor IA indisponível sem provedor) |
+| Unitários + integração (PostgreSQL 16 e Redis 7 reais) | `pnpm test` | 289 testes passando (32 arquivos; 4 de desempenho opcionais com `PERF=1`), incluindo `meta.test.ts`, `meta-actions.test.ts`, `meta-graph.test.ts` e `private-install.test.ts` |
+| Instalação | `deploy/install.sh --domain painel.localhost` (imagens locais) | migrações, API, worker, painel e Caddy saudáveis; `/api/health`, painel e SDK pelo HTTPS; cadastro público 403; proprietário criado pelo `admin.js` e login com cookie seguro |
+| Navegador (Graph API falsa) | conexão Meta, gerenciador, painel e checklist | pausar e orçamento confirmados pela Meta falsa e refletidos no painel; sem erros de console; sem estouro horizontal a 390 px em todas as rotas |
+| E2E navegador (API + worker/BullMQ + painel, banco `tracker_e2e`) | `pnpm test:e2e` | 3 testes passando (sessão 4), incluindo T70 (organização nova abre Primeiros passos, Campanhas, Clientes, Atribuição, chave de API, sino/central de notificações, manifesto e service worker, meta criada por exemplo → simulada → ativada, Gestor IA indisponível sem provedor) |
 | Web Push | `packages/connectors/test/web-push.test.ts` | mensagem cifrada (aes128gcm) decifrada com a chave do "navegador"; VAPID; 404/410 desativam a inscrição; anti-SSRF |
 | Adaptador Anthropic | `packages/ai/test/anthropic-adapter.test.ts` | pedido do SDK oficial conferido contra servidor local que imita a API (ferramentas estritas, cache, esforço, fallback por recusa); nenhuma chamada real |
 | Celular | revisão visual a 390 px | sem estouro de layout em painel, vendas, notificações, automação, Gestor IA e campanhas |
@@ -65,13 +77,14 @@ Defeitos reais encontrados e corrigidos pelos testes: corrida relay→worker (jo
 ## Limitações conhecidas (não esconder)
 
 - Lowify: sem assinatura documentada (proteção por URL secreta), moeda/fuso assumidos por configuração, reembolso tratado como integral, passagem de token por UTM ainda não confirmada com venda real.
-- Meta: nenhum envio/leitura real; limites e deduplicação navegador×servidor a revalidar (docs bloqueadas).
+- Meta: leitura e gestão implementadas e testadas só contra Graph API falsa (formatos dos SDKs oficiais); a primeira conexão real confirma valores em menor unidade e permissões (DEP-META-ACCOUNT). CAPI com envio real ainda não validado; deduplicação navegador×servidor a revalidar (docs bloqueadas). Sem criação de campanhas, criativos, relatórios assíncronos ou contas de terceiros.
 - Coorte identifica clientes pelo e-mail informado no checkout; pedidos sem e-mail contam como clientes distintos. Contribuição por cliente pendente.
 - Lowify não documenta vínculo de upsell nem parcelas/repasses: esses recursos só funcionam hoje pelo webhook canônico.
 - Métricas por movimento financeiro ainda não exibem repasses/recebíveis (tabela disponível para conciliação).
 - API pública ainda sem leads/eventos próprios; limite de taxa em janelas no banco (D-020).
 - Hospedagem real, domínio/TLS, agendamento de backups e observabilidade externa dependem do operador (DEP-HOSTING, DEP-OBSERVABILITY); e-mail real depende de conta SMTP (DEP-EMAIL).
-- Regras não executam ações na rede de anúncios (pausar, ativar, orçamento, duplicar): só simulam até existir conector de gestão Meta. Status de aprendizagem aproximado pela idade desde o primeiro gasto.
+- Regras: frequência, variação de orçamento e saldo como condição ainda indisponíveis; "desfazer" alterações não existe (o histórico mostra o valor anterior).
+- Sem SMTP (instalação padrão) não há recuperação de senha por e-mail nem convites por e-mail: use `admin.js` no servidor ou informe `--smtp-url`.
 - Gestor IA: só o adaptador Anthropic existe (OpenAI/Google planejados por falta de documentação verificada); resumo diário programado pendente; o comportamento do modelo (separar fato e hipótese, resistir a injeção) é instruído, não garantido por código.
 - Push depende do navegador/serviço de push (não garantido); no iPhone exige instalar o PWA. Monitor de fila roda no próprio worker (worker parado é detectado pelo `/ready`, não por notificação).
 - Sem WhatsApp/CRM, funis, relatórios agendados, cobrança do SaaS, app nativo nas lojas.
@@ -81,14 +94,14 @@ Defeitos reais encontrados e corrigidos pelos testes: corrida relay→worker (jo
 
 Ver [`EXTERNAL_DEPENDENCIES.md`](EXTERNAL_DEPENDENCIES.md). Os que mais destravam valor agora:
 1. **DEP-LOWIFY-SAMPLES / DEP-LOWIFY-TRACKING** — uma venda de teste autorizada com o webhook apontado para o Tracker (payloads reais anonimizados e confirmação de que o `utm_term` com token volta no webhook).
-2. **DEP-META-APP** — app Meta + token de sistema/dataset para validar CAPI em modo de teste e sincronizar gastos.
+2. **DEP-META-ACCOUNT** — colar o token de usuário do sistema em Meta Ads (painel) e conferir a primeira sincronização e uma pausa de teste; dataset/token de CAPI para validar a API de Conversões em modo de teste.
 3. **DEP-OFFICIAL-DOCS** — liberar domínios de documentação oficial na rede do ambiente.
 
 ## Próximo passo executável
 
-1. Contribuição por pedido/cliente com custos variáveis alocados e consolidação multimoeda com câmbio (R22-10).
-2. Relatórios agendados/exportações (seção 32) e resumo diário do Gestor IA (R27-03).
-3. Revisão visual em celular das telas restantes (diagnóstico, integrações, detalhe de venda) — R35-01.
-4. Após DEP-META-APP: OAuth Meta (state + PKCE), sincronização de contas/entidades/insights com paginação e backfill, saldo da conta (alerta), validação CAPI com `test_event_code`, e então ações de gestão (pausar/orçamento/duplicar) para as regras.
+1. Com a conta real (DEP-META-ACCOUNT): conferir gasto do dia × Gerenciador de Anúncios, uma pausa/ativação e um ajuste de orçamento; ajustar o manifesto para "Validado em produção" com a evidência.
+2. Gestor IA com ferramenta de leitura das campanhas sincronizadas (orçamento, aprendizado, compras reportadas) e resumo diário (R27-03).
+3. Criação rápida de campanha pausada a partir de modelo (R25-07) e frequência de período nas regras (R26-02).
+4. Contribuição por pedido/cliente com custos variáveis e câmbio (R22-10); relatórios agendados (seção 32).
 
 Para retomar: ler `CLAUDE.md`, este arquivo e a matriz; subir PostgreSQL/Redis (`service postgresql start`; `redis-server --daemonize yes --appendonly yes --dir /tmp`); em contêiner novo, criar `.env` a partir de `.env.example` (senhas locais do `db-setup`) e rodar `pnpm db:setup`; depois `pnpm install && pnpm db:migrate && pnpm test`.
